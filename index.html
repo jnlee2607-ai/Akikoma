@@ -1,0 +1,3479 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>아키코마 (Akikoma) - 공강 메이트 매칭 서비스</title>
+  <!-- Google Fonts: Outfit & Plus Jakarta Sans -->
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Leaflet.js CSS for Campus Map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <style>
+    /* ----------------------------------------------------
+       DESIGN SYSTEM & UTILITIES
+       ---------------------------------------------------- */
+    :root {
+      --bg-gradient: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+      --primary: hsl(200, 95%, 60%);
+      --primary-light: hsl(200, 95%, 85%);
+      --primary-dark: hsl(200, 80%, 45%);
+      --accent: hsl(175, 75%, 50%); /* Mint accent */
+      --accent-soft: hsl(175, 75%, 95%);
+      --neutral-dark: #1e293b;
+      --neutral-muted: #64748b;
+      --neutral-light: #f8fafc;
+      --glass-bg: rgba(255, 255, 255, 0.75);
+      --glass-border: rgba(255, 255, 255, 0.5);
+      --glass-shadow: 0 8px 32px 0 rgba(14, 116, 144, 0.08);
+      --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      --font-main: 'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: var(--font-main);
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background: var(--bg-gradient);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: var(--neutral-dark);
+      overflow-x: hidden;
+    }
+
+    /* Mobile Device Frame wrapper for desktop, standard full screen on mobile */
+    .phone-container {
+      width: 100%;
+      max-width: 430px;
+      height: 100vh;
+      max-height: 900px;
+      background: rgba(255, 255, 255, 0.45);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      box-shadow: 0 25px 50px -12px rgba(14, 116, 144, 0.15);
+      border-radius: 40px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      animation: phone-intro 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    @keyframes phone-intro {
+      from { opacity: 0; transform: translateY(40px) scale(0.97); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @media (max-width: 480px) {
+      .phone-container {
+        max-height: 100vh;
+        border-radius: 0;
+        border: none;
+        box-shadow: none;
+      }
+    }
+
+    /* Header Bar */
+    .app-header {
+      padding: 16px 20px 8px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 10;
+    }
+
+    .app-title {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 700;
+      font-size: 24px;
+      color: var(--primary-dark);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .app-title i {
+      color: var(--primary);
+    }
+
+    .user-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--neutral-dark);
+      box-shadow: var(--glass-shadow);
+      cursor: pointer;
+      transition: var(--transition-fast);
+    }
+
+    .user-badge:hover {
+      transform: translateY(-2px);
+      background: white;
+    }
+
+    .user-badge-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+    }
+
+    /* Main view container scrollable */
+    .app-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 20px 100px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      scrollbar-width: none;
+    }
+
+    .app-content::-webkit-scrollbar {
+      display: none;
+    }
+
+    /* Bottom Nav Bar */
+    .bottom-nav {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      right: 20px;
+      height: 68px;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border);
+      border-radius: 24px;
+      box-shadow: 0 10px 30px rgba(14, 116, 144, 0.1);
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      padding: 0 10px;
+      z-index: 100;
+    }
+
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      color: var(--neutral-muted);
+      text-decoration: none;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 60px;
+      height: 52px;
+      border-radius: 16px;
+      transition: var(--transition-fast);
+    }
+
+    .nav-item i {
+      width: 22px;
+      height: 22px;
+      transition: var(--transition-fast);
+    }
+
+    .nav-item:hover {
+      color: var(--primary-dark);
+      background: rgba(186, 230, 253, 0.2);
+    }
+
+    .nav-item.active {
+      color: var(--primary-dark);
+      background: rgba(186, 230, 253, 0.35);
+    }
+
+    .nav-item.active i {
+      transform: translateY(-2px);
+    }
+
+    /* Glass Card layout */
+    .glass-card {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--glass-shadow);
+      border-radius: 24px;
+      padding: 20px;
+      position: relative;
+      transition: var(--transition-normal);
+      backdrop-filter: blur(12px);
+    }
+
+    .glass-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 36px 0 rgba(14, 116, 144, 0.12);
+    }
+
+    /* Typography settings */
+    h2 {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--neutral-dark);
+    }
+
+    p.muted {
+      font-size: 13px;
+      color: var(--neutral-muted);
+      line-height: 1.5;
+    }
+
+    /* Common Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 20px;
+      border-radius: 16px;
+      font-weight: 700;
+      font-size: 14px;
+      border: none;
+      cursor: pointer;
+      transition: var(--transition-fast);
+      width: 100%;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary), #38bdf8);
+      color: white;
+      box-shadow: 0 4px 15px rgba(56, 189, 248, 0.3);
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #0284c7, var(--primary));
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(56, 189, 248, 0.4);
+    }
+
+    .btn-secondary {
+      background: var(--neutral-light);
+      border: 1px solid var(--glass-border);
+      color: var(--neutral-dark);
+    }
+
+    .btn-secondary:hover {
+      background: #f1f5f9;
+    }
+
+    .btn-text {
+      background: none;
+      color: var(--primary-dark);
+      padding: 8px;
+      width: auto;
+      font-size: 13px;
+    }
+
+    .btn-text:hover {
+      text-decoration: underline;
+    }
+
+    /* Inputs */
+    .form-group {
+      margin-bottom: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-group label {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--neutral-muted);
+    }
+
+    .form-control {
+      width: 100%;
+      padding: 12px 16px;
+      border-radius: 14px;
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      outline: none;
+      background: rgba(255, 255, 255, 0.6);
+      font-size: 14px;
+      transition: var(--transition-fast);
+    }
+
+    /* Day checkbox badge styling */
+    .day-checkbox-label input[type="checkbox"]:checked + .day-badge {
+      background: var(--primary-light) !important;
+      border-color: var(--primary) !important;
+      color: var(--primary-dark) !important;
+    }
+
+    /* Lock Overlay styling */
+    .lock-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(240, 249, 255, 0.88);
+      backdrop-filter: blur(12px);
+      z-index: 350;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 30px;
+      border-radius: 28px;
+      animation: view-fade-in 0.3s ease-out;
+    }
+
+    .lock-overlay i {
+      color: var(--primary-dark);
+      margin-bottom: 12px;
+    }
+
+    .form-control:focus {
+      border-color: var(--primary);
+      background: white;
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+    }
+
+    /* Tabs visibility toggle */
+    .view-tab {
+      display: none;
+      animation: view-fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    .view-tab.active {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    @keyframes view-fade-in {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ----------------------------------------------------
+       AUTH SECTION STYLING (Login & Signup)
+       ---------------------------------------------------- */
+    .auth-view {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: var(--bg-gradient);
+      z-index: 500;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 30px;
+    }
+
+    .auth-logo {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .auth-logo i {
+      color: var(--primary);
+      width: 48px;
+      height: 48px;
+      margin-bottom: 8px;
+    }
+
+    .auth-logo h1 {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 800;
+      color: var(--primary-dark);
+      font-size: 28px;
+      letter-spacing: -0.5px;
+    }
+
+    .auth-logo p {
+      font-size: 14px;
+      color: var(--neutral-muted);
+      margin-top: 4px;
+    }
+
+    /* Student ID / Document Verification upload area */
+    .upload-zone {
+      border: 2px dashed rgba(56, 189, 248, 0.4);
+      background: rgba(240, 249, 255, 0.5);
+      border-radius: 16px;
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      position: relative;
+      transition: var(--transition-fast);
+      margin-top: 8px;
+    }
+
+    .upload-zone:hover {
+      border-color: var(--primary);
+      background: rgba(240, 249, 255, 0.8);
+    }
+
+    .upload-zone i {
+      color: var(--primary);
+      width: 32px;
+      height: 32px;
+      margin-bottom: 8px;
+    }
+
+    .upload-zone-text {
+      font-size: 12px;
+      color: var(--neutral-muted);
+    }
+
+    .upload-preview {
+      display: none;
+      margin-top: 10px;
+      padding: 8px;
+      background: white;
+      border-radius: 12px;
+      border: 1px solid var(--glass-border);
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .upload-preview img {
+      width: 40px;
+      height: 40px;
+      object-fit: cover;
+      border-radius: 6px;
+    }
+
+    .upload-preview-info {
+      flex: 1;
+      text-align: left;
+    }
+
+    .upload-preview-name {
+      font-size: 12px;
+      font-weight: 700;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 180px;
+    }
+
+    .upload-preview-status {
+      font-size: 10px;
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    /* Custom Switcher link */
+    .auth-toggle-link {
+      text-align: center;
+      margin-top: 16px;
+      font-size: 13px;
+      color: var(--neutral-muted);
+    }
+
+    .auth-toggle-link span {
+      color: var(--primary-dark);
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+
+    /* Verification Overlay loader */
+    .verify-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(255, 255, 255, 0.9);
+      z-index: 1000;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 30px;
+      backdrop-filter: blur(8px);
+    }
+
+    .verify-loader {
+      width: 50px;
+      height: 50px;
+      border: 4px solid var(--primary-light);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 1s infinite linear;
+      margin-bottom: 20px;
+    }
+
+    .verify-success-icon {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: var(--accent-soft);
+      color: var(--accent);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+      box-shadow: 0 0 20px rgba(20, 184, 166, 0.2);
+    }
+
+    .verify-success-icon i {
+      width: 32px;
+      height: 32px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* ----------------------------------------------------
+       HOME TAB STYLING
+       ---------------------------------------------------- */
+    .greeting-card {
+      background: linear-gradient(135deg, rgba(186, 230, 253, 0.4), rgba(240, 253, 250, 0.4));
+      border: 1px solid var(--glass-border);
+      border-radius: 28px;
+    }
+
+    .timeline-container {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      position: relative;
+      margin-top: 8px;
+    }
+
+    .timeline-item {
+      display: flex;
+      gap: 16px;
+      position: relative;
+    }
+
+    .timeline-item::before {
+      content: '';
+      position: absolute;
+      left: 17px;
+      top: 24px;
+      bottom: -20px;
+      width: 2px;
+      background: var(--primary-light);
+      z-index: 1;
+    }
+
+    .timeline-item:last-child::before {
+      display: none;
+    }
+
+    .timeline-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 13px;
+      z-index: 2;
+    }
+
+    .timeline-icon.class {
+      background: var(--primary-light);
+      color: var(--primary-dark);
+    }
+
+    .timeline-icon.free {
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    .timeline-detail {
+      flex: 1;
+      padding-top: 4px;
+    }
+
+    .timeline-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--neutral-dark);
+    }
+
+    .timeline-subtitle {
+      font-size: 12px;
+      color: var(--neutral-muted);
+      margin-top: 2px;
+    }
+
+    /* Empty states card */
+    .empty-state {
+      text-align: center;
+      padding: 30px 20px;
+    }
+
+    .empty-state i {
+      color: var(--primary-light);
+      width: 48px;
+      height: 48px;
+      margin-bottom: 12px;
+    }
+
+    /* ----------------------------------------------------
+       TIMETABLE TAB STYLING
+       ---------------------------------------------------- */
+    .timetable-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .timetable-scroll-box {
+      width: 100%;
+      overflow-x: auto;
+      border-radius: 20px;
+      background: white;
+      border: 1px solid var(--glass-border);
+      box-shadow: 0 4px 20px rgba(14, 116, 144, 0.03);
+    }
+
+    .timetable-grid {
+      display: grid;
+      grid-template-columns: 45px repeat(5, 1fr);
+      min-width: 480px;
+      position: relative;
+      background: #fff;
+    }
+
+    .timetable-header-cell {
+      padding: 10px 4px;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--neutral-muted);
+      border-bottom: 1px solid #e2e8f0;
+      background: var(--neutral-light);
+    }
+
+    .timetable-time-column {
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #e2e8f0;
+      background: var(--neutral-light);
+    }
+
+    .timetable-hour-cell {
+      height: 48px; /* height representation for 1 hour */
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 4px;
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--neutral-muted);
+      border-bottom: 1px dashed #f1f5f9;
+    }
+
+    .timetable-columns-container {
+      grid-column: 2 / span 5;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      height: 576px; /* 12 hours * 48px */
+      position: relative;
+    }
+
+    .timetable-day-col {
+      border-right: 1px solid #f1f5f9;
+      position: relative;
+      height: 100%;
+    }
+
+    .timetable-day-col:last-child {
+      border-right: none;
+    }
+
+    /* Timetable grid horizontal helper lines */
+    .timetable-bg-lines {
+      position: absolute;
+      top: 0;
+      left: 45px;
+      right: 0;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .timetable-bg-line {
+      height: 48px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    /* Visual block card for class */
+    .class-block {
+      position: absolute;
+      left: 4px;
+      right: 4px;
+      border-radius: 8px;
+      padding: 6px;
+      font-size: 10px;
+      font-weight: 700;
+      color: #0369a1;
+      background: rgba(186, 230, 253, 0.85);
+      border-left: 3px solid var(--primary);
+      box-shadow: 0 2px 8px rgba(56, 189, 248, 0.1);
+      cursor: pointer;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      z-index: 5;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: var(--transition-fast);
+    }
+
+    .class-block:hover {
+      transform: scale(1.02);
+      z-index: 10;
+      background: rgba(186, 230, 253, 0.95);
+      box-shadow: 0 4px 12px rgba(56, 189, 248, 0.2);
+    }
+
+    .class-block-title {
+      font-weight: 800;
+      font-size: 10px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .class-block-info {
+      font-size: 8px;
+      color: #0c4a6e;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 1px;
+    }
+
+    /* Modal dialog style */
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(30, 41, 59, 0.4);
+      backdrop-filter: blur(6px);
+      z-index: 600;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .modal-content {
+      background: white;
+      border-radius: 28px;
+      width: 100%;
+      max-width: 380px;
+      padding: 24px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+      animation: modal-intro 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    }
+
+    @keyframes modal-intro {
+      from { transform: scale(0.9) translateY(20px); opacity: 0; }
+      to { transform: scale(1) translateY(0); opacity: 1; }
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+
+    .modal-title {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--neutral-dark);
+    }
+
+    .modal-close {
+      border: none;
+      background: #f1f5f9;
+      color: var(--neutral-muted);
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-close:hover {
+      background: #e2e8f0;
+      color: var(--neutral-dark);
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    /* ----------------------------------------------------
+       MATCHING & MAP TAB STYLING
+       ---------------------------------------------------- */
+    .map-container-wrapper {
+      position: relative;
+      width: 100%;
+      height: 220px;
+      border-radius: 24px;
+      overflow: hidden;
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--glass-shadow);
+      z-index: 1;
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+
+    .map-instruction {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      right: 10px;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 6px 12px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--primary-dark);
+      text-align: center;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      pointer-events: none;
+      z-index: 1000;
+    }
+
+    /* Leaflet custom pulsing markers to bypass missing asset errors */
+    .pulse-marker {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      position: relative;
+    }
+
+    .pulse-marker.user {
+      background: var(--primary);
+      border: 2px solid white;
+      box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.4);
+    }
+    
+    .pulse-marker.user::after {
+      content: '';
+      position: absolute;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 2px solid var(--primary);
+      top: -10px;
+      left: -10px;
+      animation: pulse-ring 1.8s infinite ease-in-out;
+    }
+
+    .pulse-marker.mate {
+      background: var(--accent);
+      border: 2px solid white;
+      box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.4);
+    }
+
+    .pulse-marker.mate::after {
+      content: '';
+      position: absolute;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 2px solid var(--accent);
+      top: -10px;
+      left: -10px;
+      animation: pulse-ring 1.8s infinite ease-in-out;
+    }
+
+    @keyframes pulse-ring {
+      0% { transform: scale(0.5); opacity: 1; }
+      100% { transform: scale(1.5); opacity: 0; }
+    }
+
+    /* Activity chips selectors */
+    .activity-chips {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 4px 0;
+      scrollbar-width: none;
+    }
+
+    .activity-chips::-webkit-scrollbar {
+      display: none;
+    }
+
+    .activity-chip {
+      padding: 10px 16px;
+      border-radius: 20px;
+      background: white;
+      border: 1px solid var(--glass-border);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+      transition: var(--transition-fast);
+      box-shadow: 0 2px 6px rgba(14, 116, 144, 0.03);
+    }
+
+    .activity-chip:hover {
+      background: #f0f9ff;
+      border-color: var(--primary);
+    }
+
+    .activity-chip.active {
+      background: var(--primary-light);
+      border-color: var(--primary);
+      color: var(--primary-dark);
+      transform: translateY(-1px);
+    }
+
+    /* Mate cards */
+    .mate-card {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 10px;
+    }
+
+    .mate-item {
+      background: white;
+      border: 1px solid var(--glass-border);
+      border-radius: 20px;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      box-shadow: 0 4px 16px rgba(14, 116, 144, 0.03);
+      transition: var(--transition-fast);
+    }
+
+    .mate-item:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(14, 116, 144, 0.06);
+    }
+
+    .mate-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #bae6fd, #e0f2fe);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+
+    .mate-info {
+      flex: 1;
+    }
+
+    .mate-name {
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--neutral-dark);
+    }
+
+    .mate-dept {
+      font-size: 11px;
+      color: var(--neutral-muted);
+      margin-top: 2px;
+    }
+
+    .mate-distance {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      padding: 3px 8px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      margin-top: 6px;
+    }
+
+    .mate-action {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+    }
+
+    /* ----------------------------------------------------
+       CHAT TAB STYLING
+       ---------------------------------------------------- */
+    .chatroom-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .chatroom-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 16px;
+      background: white;
+      border: 1px solid var(--glass-border);
+      border-radius: 20px;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(14, 116, 144, 0.03);
+      transition: var(--transition-fast);
+    }
+
+    .chatroom-item:hover {
+      background: #f8fafc;
+      transform: translateY(-1px);
+    }
+
+    .chatroom-details {
+      flex: 1;
+    }
+
+    .chatroom-title {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--neutral-dark);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .chatroom-time {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--neutral-muted);
+    }
+
+    .chatroom-msg {
+      font-size: 12px;
+      color: var(--neutral-muted);
+      margin-top: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 220px;
+    }
+
+    /* Chat View modal-like panel overlay */
+    .chat-panel {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: var(--bg-gradient);
+      z-index: 400;
+      display: none;
+      flex-direction: column;
+    }
+
+    .chat-panel-header {
+      padding: 16px 20px;
+      background: white;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .chat-panel-back {
+      border: none;
+      background: none;
+      cursor: pointer;
+      color: var(--neutral-dark);
+    }
+
+    .chat-panel-info {
+      flex: 1;
+    }
+
+    .chat-panel-title {
+      font-size: 15px;
+      font-weight: 800;
+    }
+
+    .chat-panel-subtitle {
+      font-size: 11px;
+      color: var(--neutral-muted);
+    }
+
+    .chat-panel-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .chat-message {
+      max-width: 75%;
+      padding: 12px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      line-height: 1.5;
+      position: relative;
+      animation: message-intro 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    @keyframes message-intro {
+      from { opacity: 0; transform: translateY(8px) scale(0.95); }
+      to { opacity: 1; transform: translateY(0); scale(1); }
+    }
+
+    .chat-message.sent {
+      align-self: flex-end;
+      background: var(--primary);
+      color: white;
+      border-bottom-right-radius: 4px;
+    }
+
+    .chat-message.received {
+      align-self: flex-start;
+      background: white;
+      color: var(--neutral-dark);
+      border-bottom-left-radius: 4px;
+      border: 1px solid var(--glass-border);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+    }
+
+    .chat-message-time {
+      font-size: 9px;
+      color: rgba(0, 0, 0, 0.3);
+      margin-top: 4px;
+      text-align: right;
+    }
+
+    .chat-message.sent .chat-message-time {
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .chat-typing-indicator {
+      align-self: flex-start;
+      background: white;
+      padding: 12px 20px;
+      border-radius: 20px;
+      border-bottom-left-radius: 4px;
+      border: 1px solid var(--glass-border);
+      display: none;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .chat-typing-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--neutral-muted);
+      border-radius: 50%;
+      animation: typing-bounce 1.4s infinite ease-in-out both;
+    }
+
+    .chat-typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .chat-typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes typing-bounce {
+      0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+      40% { transform: scale(1); opacity: 1; }
+    }
+
+    .chat-panel-footer {
+      padding: 16px 20px 24px 20px;
+      background: white;
+      border-top: 1px solid rgba(148, 163, 184, 0.1);
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .chat-input {
+      flex: 1;
+      padding: 12px 18px;
+      border-radius: 24px;
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      outline: none;
+      font-size: 13px;
+      background: #f8fafc;
+    }
+
+    .chat-input:focus {
+      background: white;
+      border-color: var(--primary);
+    }
+
+    .chat-send-btn {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: white;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: var(--transition-fast);
+    }
+
+    .chat-send-btn:hover {
+      background: var(--primary-dark);
+    }
+
+    /* ----------------------------------------------------
+       PROFILE TAB STYLING
+       ---------------------------------------------------- */
+    .profile-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding: 24px;
+    }
+
+    .profile-avatar {
+      width: 72px;
+      height: 72px;
+      border-radius: 24px;
+      background: linear-gradient(135deg, var(--primary-light), var(--primary));
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      box-shadow: 0 8px 24px rgba(56, 189, 248, 0.2);
+    }
+
+    .profile-name {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--neutral-dark);
+    }
+
+    .profile-dept {
+      font-size: 12px;
+      color: var(--neutral-muted);
+      margin-top: 4px;
+    }
+
+    .profile-verify-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      margin-top: 10px;
+      border: 1px solid rgba(20, 184, 166, 0.2);
+    }
+
+    .profile-info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+      font-size: 13px;
+    }
+
+    .profile-info-row:last-child {
+      border-bottom: none;
+    }
+
+    .profile-info-label {
+      color: var(--neutral-muted);
+      font-weight: 600;
+    }
+
+    .profile-info-val {
+      font-weight: 700;
+      color: var(--neutral-dark);
+    }
+
+    /* Toast Notification system */
+    .toast-container {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      right: 20px;
+      z-index: 2000;
+      pointer-events: none;
+    }
+
+    .toast {
+      background: rgba(30, 41, 59, 0.95);
+      color: white;
+      padding: 14px 18px;
+      border-radius: 16px;
+      font-size: 12px;
+      font-weight: 700;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+      animation: toast-intro 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+      backdrop-filter: blur(8px);
+      pointer-events: auto;
+    }
+
+    @keyframes toast-intro {
+      from { transform: translateY(-20px) scale(0.9); opacity: 0; }
+      to { transform: translateY(0) scale(1); opacity: 1; }
+    }
+
+    .toast.success {
+      border-left: 4px solid var(--accent);
+    }
+
+    .toast.info {
+      border-left: 4px solid var(--primary);
+    }
+
+    .toast-close {
+      margin-left: auto;
+      background: none;
+      border: none;
+      color: rgba(255, 255, 255, 0.6);
+      cursor: pointer;
+    }
+
+    .toast-close:hover {
+      color: white;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- MOBILE DEVICE CONTAINING SHELL -->
+  <div class="phone-container">
+    
+    <!-- Toast Message area -->
+    <div class="toast-container" id="toast-holder"></div>
+
+    <!-- MOCK REVIEW VERIFICATION ANIMATION SCREEN -->
+    <div class="verify-overlay" id="verify-screen">
+      <div class="verify-loader" id="verify-loader"></div>
+      <div class="verify-success-icon" id="verify-success">
+        <i data-lucide="check"></i>
+      </div>
+      <h2 id="verify-status-title" style="margin-bottom: 6px;">대학 재학 인증 심사 중</h2>
+      <p class="muted" id="verify-status-desc" style="max-width: 280px;">제출하신 학생증 파일을 관리자가 검토하여 학교 소속을 확인하고 있습니다. 잠시만 기다려주세요...</p>
+    </div>
+
+    <!-- 1. AUTHENTICATION MODULE (Login & Signup) -->
+    <div class="auth-view" id="auth-panel">
+      <!-- Auth Form Card -->
+      <div class="glass-card" style="padding: 26px;">
+        
+        <div class="auth-logo">
+          <i data-lucide="clock"></i>
+          <h1>아키코마</h1>
+          <p>시간표 분석 기반 공강 메이트 매칭</p>
+        </div>
+
+        <!-- Login Form -->
+        <form id="login-form">
+          <div class="form-group">
+            <label for="login-email">이메일 주소</label>
+            <input type="email" id="login-email" class="form-control" placeholder="example@univ.ac.kr" required value="student@univ.ac.kr">
+          </div>
+          <div class="form-group">
+            <label for="login-pw">비밀번호</label>
+            <input type="password" id="login-pw" class="form-control" placeholder="비밀번호 입력" required value="password123">
+          </div>
+          <button type="submit" class="btn btn-primary" style="margin-top: 10px;">로그인</button>
+        </form>
+
+        <!-- Signup Form (Hidden initially) -->
+        <form id="signup-form" style="display: none;">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="signup-name">이름</label>
+              <input type="text" id="signup-name" class="form-control" placeholder="홍길동" required>
+            </div>
+            <div class="form-group">
+              <label for="signup-school">대학교</label>
+              <input type="text" id="signup-school" class="form-control" placeholder="연세대학교" required value="연세대학교">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="signup-dept">학과</label>
+              <input type="text" id="signup-dept" class="form-control" placeholder="컴퓨터공학과" required>
+            </div>
+            <div class="form-group">
+              <label for="signup-sid">학번 (학기)</label>
+              <input type="text" id="signup-sid" class="form-control" placeholder="23학번" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="signup-email">이메일</label>
+            <input type="email" id="signup-email" class="form-control" placeholder="example@univ.ac.kr" required>
+          </div>
+          <div class="form-group">
+            <label for="signup-pw">비밀번호</label>
+            <input type="password" id="signup-pw" class="form-control" placeholder="비밀번호 설정" required>
+          </div>
+          
+          <!-- Student Verification File Upload Option -->
+          <div class="form-group">
+            <label>대학 소속 및 재학 인증</label>
+            <div class="form-row" style="margin-bottom: 6px; gap: 8px;">
+              <label style="display: flex; align-items: center; gap: 4px; font-weight: 500; font-size: 11px; cursor: pointer;">
+                <input type="radio" name="verify-type" value="freshman" checked> 신입생 (합격증 캡처)
+              </label>
+              <label style="display: flex; align-items: center; gap: 4px; font-weight: 500; font-size: 11px; cursor: pointer;">
+                <input type="radio" name="verify-type" value="student"> 재학생 (학생증/포털 캡처)
+              </label>
+            </div>
+            
+            <div class="upload-zone" id="verify-upload-zone">
+              <i data-lucide="cloud-upload"></i>
+              <div class="upload-zone-text" id="upload-instruction">파일 드래그 & 드롭 또는 클릭하여 업로드</div>
+              <input type="file" id="signup-file" style="display: none;" accept="image/*">
+            </div>
+
+            <!-- Upload File Preview box -->
+            <div class="upload-preview" id="verify-preview-box">
+              <img src="" id="verify-preview-img" alt="Thumbnail">
+              <div class="upload-preview-info">
+                <div class="upload-preview-name" id="verify-preview-filename">student_id.png</div>
+                <div class="upload-preview-status">대기중인 이미지</div>
+              </div>
+              <button type="button" class="btn-close" id="verify-clear-upload" style="background:none; border:none; cursor:pointer; color:var(--neutral-muted);"><i data-lucide="x" style="width:16px; height:16px;"></i></button>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="margin-top: 10px;">회원가입 신청</button>
+        </form>
+
+        <div class="auth-toggle-link" id="auth-switcher-wrap">
+          계정이 없으신가요? <span id="auth-switcher">회원가입</span>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- APP SHELL SECTION (Shown after login) -->
+    <header class="app-header">
+      <div class="app-title">
+        <i data-lucide="clock"></i>
+        <span>Akikoma</span>
+      </div>
+      <div class="user-badge" id="header-user-badge" onclick="switchTab('profile')">
+        <div class="user-badge-dot"></div>
+        <span id="header-user-name">학우님</span>
+      </div>
+    </header>
+
+    <!-- CONTENT VIEWS FRAME -->
+    <main class="app-content">
+
+      <!-- ==================== HOME TAB ==================== -->
+      <section class="view-tab active" id="view-home">
+        <!-- Home Verification Warning notice card (hidden by default) -->
+        <div class="glass-card" id="home-verify-warning" style="display: none; border-left: 4px solid #eab308; background: rgba(254, 249, 195, 0.4); margin-bottom: 16px;">
+          <h2 style="color: #a16207; font-size:15px; margin-bottom:4px;">
+            <i data-lucide="alert-triangle" style="width:18px; height:18px; color:#eab308;"></i>재학 인증 검토 중
+          </h2>
+          <p class="muted" style="font-size:12px; color: #854d0e;">제출하신 인증 서류를 검토하고 있습니다. 매칭 및 채팅 이용을 위해 인증 승인이 필요합니다.</p>
+          <button class="btn btn-primary btn-text" onclick="simulateAdminApproval()" style="color:#a16207; text-decoration:underline; font-weight:700; margin-top:8px; padding:0; display:inline-block; font-size:11px;">즉시 모의 승인 완료하기 🔑</button>
+        </div>
+
+        <!-- Greetings glass card -->
+        <article class="glass-card greeting-card">
+          <h2 id="home-greeting">안녕하세요! 👋</h2>
+          <p class="muted" style="margin-top: 4px;">시간표를 기반으로 공강 메이트를 찾아보세요. 아래에서 오늘 일정을 확인하고 매칭을 시작할 수 있습니다.</p>
+        </article>
+
+        <!-- Today's Schedule Timeline -->
+        <article class="glass-card">
+          <h2 style="margin-bottom: 16px;"><i data-lucide="calendar-check" style="color:var(--primary);"></i>오늘의 공강 및 일정</h2>
+          <div class="timeline-container" id="home-timeline">
+            <!-- Dynamically populated -->
+          </div>
+        </article>
+
+        <!-- Current Matches Panel -->
+        <article class="glass-card">
+          <h2><i data-lucide="heart-handshake" style="color:var(--accent);"></i>나의 매칭 신청 현황</h2>
+          <div id="home-match-requests" style="margin-top: 12px; display: flex; flex-direction: column; gap: 10px;">
+            <!-- Dynamically populated -->
+          </div>
+        </article>
+      </section>
+
+      <!-- ==================== TIMETABLE TAB ==================== -->
+      <section class="view-tab" id="view-timetable">
+        <article class="glass-card" style="padding: 16px;">
+          <div class="timetable-header">
+            <h2><i data-lucide="calendar" style="color:var(--primary);"></i>나의 시간표</h2>
+            <button class="btn btn-primary btn-text" id="btn-open-add-class" style="font-weight: 700;">+ 수업 추가</button>
+          </div>
+          
+          <p class="muted" style="margin-bottom: 12px; font-size: 11px;">수업 등록 시, 수업 사이의 공강 구간(최소 30분 이상)이 실시간 자동 계산됩니다.</p>
+          
+          <!-- Responsive grid box -->
+          <div class="timetable-scroll-box">
+            <div class="timetable-grid">
+              
+              <!-- Top days row header -->
+              <div class="timetable-header-cell"></div>
+              <div class="timetable-header-cell">월</div>
+              <div class="timetable-header-cell">화</div>
+              <div class="timetable-header-cell">수</div>
+              <div class="timetable-header-cell">목</div>
+              <div class="timetable-header-cell">금</div>
+
+              <!-- Left hour ticks column -->
+              <div class="timetable-time-column">
+                <div class="timetable-hour-cell">08:00</div>
+                <div class="timetable-hour-cell">09:00</div>
+                <div class="timetable-hour-cell">10:00</div>
+                <div class="timetable-hour-cell">11:00</div>
+                <div class="timetable-hour-cell">12:00</div>
+                <div class="timetable-hour-cell">13:00</div>
+                <div class="timetable-hour-cell">14:00</div>
+                <div class="timetable-hour-cell">15:00</div>
+                <div class="timetable-hour-cell">16:00</div>
+                <div class="timetable-hour-cell">17:00</div>
+                <div class="timetable-hour-cell">18:00</div>
+                <div class="timetable-hour-cell">19:00</div>
+              </div>
+
+              <!-- Day Columns containing absolute blocks -->
+              <div class="timetable-columns-container" id="timetable-columns-box">
+                <div class="timetable-day-col" data-day="0"></div>
+                <div class="timetable-day-col" data-day="1"></div>
+                <div class="timetable-day-col" data-day="2"></div>
+                <div class="timetable-day-col" data-day="3"></div>
+                <div class="timetable-day-col" data-day="4"></div>
+              </div>
+
+              <!-- Grid Horizontal line helpers background -->
+              <div class="timetable-bg-lines">
+                <div class="timetable-bg-line"></div>
+                <div class="timetable-bg-line"></div>
+                <div class="timetable-bg-line"></div>
+                <div class="timetable-bg-line"></div>
+                <div class="timetable-bg-line"></div>
+                <div class="timetable-bg-line"></div>
+                <div class="timetable-bg-line"></div>
+                <div class="timetable-bg-line"></div>
+                <div class="timetable-bg-line"></div>
+                <div class="timetable-bg-line"></div>
+                <div class="timetable-bg-line"></div>
+                <div class="timetable-bg-line"></div>
+              </div>
+
+            </div>
+          </div>
+        </article>
+
+        <!-- Calculated Empty Hours list -->
+        <article class="glass-card">
+          <h2><i data-lucide="clock-alert" style="color:var(--accent);"></i>자동 계산된 내 공강 슬롯</h2>
+          <div id="timetable-free-slots" style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
+            <!-- Dynamically populated -->
+          </div>
+        </article>
+      </section>
+
+      <!-- ==================== MATCH TAB ==================== -->
+      <section class="view-tab" id="view-match" style="position: relative;">
+        <!-- Match View Lock Overlay -->
+        <div class="lock-overlay" id="match-lock-overlay" style="display: none;">
+          <i data-lucide="shield-alert" style="width:48px; height:48px; color:#eab308;"></i>
+          <h2 style="margin-bottom: 8px; font-weight: 800;">재학 인증 대기 중</h2>
+          <p class="muted" style="max-width: 280px; margin-bottom: 20px; font-size: 12px; line-height: 1.5;">공강 메이트 매칭은 안전한 소속 인증이 완료된 후에 이용할 수 있습니다.</p>
+          <button class="btn btn-primary" onclick="simulateAdminApproval()" style="width:auto; padding:10px 20px; font-size: 13px;">모의 인증 승인 완료하기 🔑</button>
+        </div>
+
+        <!-- Interactive Leaflet Map -->
+        <article class="map-container-wrapper">
+          <div class="map-instruction">지도를 클릭하여 나의 현재 캠퍼스 위치를 설정하세요</div>
+          <div id="map"></div>
+        </article>
+
+        <!-- Matching Selector filter -->
+        <article class="glass-card">
+          <h2><i data-lucide="search" style="color:var(--primary);"></i>공강 메이트 매칭 검색</h2>
+          
+          <div class="form-group" style="margin-top: 12px;">
+            <label for="match-slot-select">나의 공강 시간대 선택</label>
+            <select id="match-slot-select" class="form-control">
+              <!-- Dynamically populated based on computed free times -->
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>희망 공강 활동 선택</label>
+            <div class="activity-chips" id="match-activity-chips">
+              <div class="activity-chip active" data-activity="식사">🍔 식사</div>
+              <div class="activity-chip" data-activity="카페">☕ 카페</div>
+              <div class="activity-chip" data-activity="공부">✍️ 공부</div>
+              <div class="activity-chip" data-activity="팀플">👥 팀플</div>
+              <div class="activity-chip" data-activity="산책">🌳 산책</div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="match-loc-input">선호 만남 장소</label>
+            <input type="text" id="match-loc-input" class="form-control" placeholder="예: 학생회관 푸드코트, 도서관 로비 등" value="학생회관 식당">
+          </div>
+
+          <button class="btn btn-primary" id="btn-search-mates">매칭 상대 조회하기</button>
+        </article>
+
+        <!-- Matched list results -->
+        <article class="glass-card">
+          <h2><i data-lucide="users" style="color:var(--accent);"></i>내 주변 매칭 메이트 후보</h2>
+          <div class="mate-card" id="match-results-box">
+            <!-- Dynamically populated -->
+          </div>
+        </article>
+      </section>
+
+      <!-- ==================== CHAT TAB ==================== -->
+      <section class="view-tab" id="view-chat" style="position: relative;">
+        <!-- Chat View Lock Overlay -->
+        <div class="lock-overlay" id="chat-lock-overlay" style="display: none;">
+          <i data-lucide="lock" style="width:48px; height:48px; color:#eab308;"></i>
+          <h2 style="margin-bottom: 8px; font-weight: 800;">재학 인증 대기 중</h2>
+          <p class="muted" style="max-width: 280px; margin-bottom: 20px; font-size: 12px; line-height: 1.5;">메이트와의 채팅 기능은 재학 인증이 완료된 후에 이용하실 수 있습니다.</p>
+          <button class="btn btn-primary" onclick="simulateAdminApproval()" style="width:auto; padding:10px 20px; font-size: 13px;">모의 인증 승인 완료하기 🔑</button>
+        </div>
+
+        <article class="glass-card">
+          <h2><i data-lucide="message-square" style="color:var(--primary);"></i>활성 채팅방 목록</h2>
+          <div class="chatroom-list" id="chatrooms-box" style="margin-top: 12px;">
+            <!-- Dynamically populated -->
+          </div>
+        </article>
+      </section>
+
+      <!-- ==================== PROFILE TAB ==================== -->
+      <section class="view-tab" id="view-profile">
+        <article class="glass-card profile-card">
+          <div class="profile-avatar" id="profile-avatar-lbl">김</div>
+          <div class="profile-name" id="profile-name-lbl">김아키</div>
+          <div class="profile-dept" id="profile-dept-lbl">연세대학교 · 컴퓨터공학과</div>
+          <div class="profile-verify-badge">
+            <i data-lucide="shield-check" style="width:14px; height:14px;"></i>
+            <span id="profile-verify-status">재학 인증 완료 (학생증)</span>
+          </div>
+        </article>
+
+        <article class="glass-card">
+          <h2><i data-lucide="info" style="color:var(--primary);"></i>상세 학생 정보</h2>
+          <div style="margin-top: 10px; display: flex; flex-direction: column;">
+            <div class="profile-info-row">
+              <span class="profile-info-label">학번</span>
+              <span class="profile-info-val" id="profile-sid-lbl">23학번</span>
+            </div>
+            <div class="profile-info-row">
+              <span class="profile-info-label">이메일</span>
+              <span class="profile-info-val" id="profile-email-lbl">student@univ.ac.kr</span>
+            </div>
+            <div class="profile-info-row">
+              <span class="profile-info-label">인증 서류</span>
+              <span class="profile-info-val" id="profile-doc-lbl">student_id.png</span>
+            </div>
+          </div>
+        </article>
+
+        <button class="btn btn-secondary" id="btn-logout" style="margin-top: 10px;">로그아웃</button>
+        <button class="btn btn-text" id="btn-reset-db" style="margin-top: 5px; color:#ef4444; width:100%; text-align:center;">데모 초기화 (모든 데이터 리셋)</button>
+      </section>
+
+    </main>
+
+    <!-- 2. INTERACTIVE CHAT ROOM OVERLAY PANEL -->
+    <div class="chat-panel" id="chat-conversation-panel">
+      
+      <!-- Chat Header -->
+      <div class="chat-panel-header">
+        <button class="chat-panel-back" id="btn-close-chat">
+          <i data-lucide="chevron-left"></i>
+        </button>
+        <div class="chat-panel-info">
+          <div class="chat-panel-title" id="chat-mate-name">박수현 학우</div>
+          <div class="chat-panel-subtitle" id="chat-mate-status">경영학과 · 도서관 부근 (나와 150m)</div>
+        </div>
+      </div>
+
+      <!-- Live mini map inside Chat for visual premium effect -->
+      <div id="chat-minimap" style="width:100%; height:80px; border-bottom:1px solid rgba(148,163,184,0.15); pointer-events:none;"></div>
+
+      <!-- Chat Stream Body -->
+      <div class="chat-panel-body" id="chat-stream-box">
+        <!-- Message Bubbles -->
+      </div>
+
+      <!-- Chat input typing indicator -->
+      <div class="chat-typing-indicator" id="chat-typing-bubble" style="margin-left: 20px; margin-bottom: 10px;">
+        <div class="chat-typing-dot"></div>
+        <div class="chat-typing-dot"></div>
+        <div class="chat-typing-dot"></div>
+      </div>
+
+      <!-- Chat Footer Send Area -->
+      <div class="chat-panel-footer">
+        <input type="text" class="chat-input" id="chat-message-input" placeholder="메시지를 입력하세요...">
+        <button class="chat-send-btn" id="btn-send-message">
+          <i data-lucide="send" style="width: 18px; height: 18px;"></i>
+        </button>
+      </div>
+
+    </div>
+
+    <!-- 3. CLASS ADDITION MODAL -->
+    <div class="modal-backdrop" id="add-class-modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 class="modal-title">새 수업 추가</h3>
+          <button class="modal-close" id="btn-close-class-modal"><i data-lucide="x"></i></button>
+        </div>
+        <form id="add-class-form">
+          <div class="form-group">
+            <label for="class-name">수업명</label>
+            <input type="text" id="class-name" class="form-control" placeholder="예: 알고리즘 설계" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="class-prof">교수명</label>
+              <input type="text" id="class-prof" class="form-control" placeholder="예: 김연세 교수님" required>
+            </div>
+            <div class="form-group">
+              <label for="class-room">강의실 (장소)</label>
+              <input type="text" id="class-room" class="form-control" placeholder="예: 공학관 301호" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>요일 (복수 선택 가능)</label>
+            <div class="day-selector-container" style="display: flex; gap: 8px; margin-top: 4px;">
+              <label class="day-checkbox-label" style="flex: 1; text-align: center;">
+                <input type="checkbox" name="class-day-check" value="0" style="display:none;">
+                <span class="day-badge" style="display: block; padding: 10px 0; border-radius: 12px; border: 1px solid var(--glass-border); background: white; font-size: 13px; font-weight: 700; cursor: pointer; transition: var(--transition-fast);">월</span>
+              </label>
+              <label class="day-checkbox-label" style="flex: 1; text-align: center;">
+                <input type="checkbox" name="class-day-check" value="1" style="display:none;">
+                <span class="day-badge" style="display: block; padding: 10px 0; border-radius: 12px; border: 1px solid var(--glass-border); background: white; font-size: 13px; font-weight: 700; cursor: pointer; transition: var(--transition-fast);">화</span>
+              </label>
+              <label class="day-checkbox-label" style="flex: 1; text-align: center;">
+                <input type="checkbox" name="class-day-check" value="2" style="display:none;">
+                <span class="day-badge" style="display: block; padding: 10px 0; border-radius: 12px; border: 1px solid var(--glass-border); background: white; font-size: 13px; font-weight: 700; cursor: pointer; transition: var(--transition-fast);">수</span>
+              </label>
+              <label class="day-checkbox-label" style="flex: 1; text-align: center;">
+                <input type="checkbox" name="class-day-check" value="3" style="display:none;">
+                <span class="day-badge" style="display: block; padding: 10px 0; border-radius: 12px; border: 1px solid var(--glass-border); background: white; font-size: 13px; font-weight: 700; cursor: pointer; transition: var(--transition-fast);">목</span>
+              </label>
+              <label class="day-checkbox-label" style="flex: 1; text-align: center;">
+                <input type="checkbox" name="class-day-check" value="4" style="display:none;">
+                <span class="day-badge" style="display: block; padding: 10px 0; border-radius: 12px; border: 1px solid var(--glass-border); background: white; font-size: 13px; font-weight: 700; cursor: pointer; transition: var(--transition-fast);">금</span>
+              </label>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="class-start">시작 시간</label>
+              <select id="class-start" class="form-control">
+                <!-- Javascript populated: 08:00 to 20:00 -->
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="class-end">종료 시간</label>
+              <select id="class-end" class="form-control">
+                <!-- Javascript populated -->
+              </select>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary" style="margin-top: 10px; width: 100%;">시간표 추가</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- 4. SEND MATCH REQUEST MODAL -->
+    <div class="modal-backdrop" id="match-request-modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 class="modal-title">매칭 신청 보내기</h3>
+          <button class="modal-close" id="btn-close-match-modal"><i data-lucide="x"></i></button>
+        </div>
+        <div style="margin-bottom: 14px;">
+          <p class="muted" style="font-size:12px; margin-bottom:4px;">상대방 학우</p>
+          <div style="font-weight: 700; font-size:15px;" id="match-target-name">박수현 (경영학과)</div>
+          <div style="font-size:12px; color:var(--neutral-muted);" id="match-target-detail">월요일 12:15 - 15:00 공강 · 식사 메이트 희망</div>
+        </div>
+        <form id="match-request-form">
+          <input type="hidden" id="match-target-id">
+          <div class="form-group">
+            <label for="match-message">인사 및 하고 싶은 말</label>
+            <textarea id="match-message" class="form-control" rows="3" style="resize:none;" placeholder="같이 맛있는 식사해요! 몇 시에 어디가 편하신가요?" required></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary" style="width: 100%;">매칭 신청 전송</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- BOTTOM TAB NAVIGATION BAR -->
+    <nav class="bottom-nav">
+      <div class="nav-item active" onclick="switchTab('home')">
+        <i data-lucide="home"></i>
+        <span>홈</span>
+      </div>
+      <div class="nav-item" onclick="switchTab('timetable')">
+        <i data-lucide="calendar"></i>
+        <span>시간표</span>
+      </div>
+      <div class="nav-item" onclick="switchTab('match')">
+        <i data-lucide="search"></i>
+        <span>메이트</span>
+      </div>
+      <div class="nav-item" onclick="switchTab('chat')">
+        <i data-lucide="message-square"></i>
+        <span>채팅</span>
+      </div>
+      <div class="nav-item" onclick="switchTab('profile')">
+        <i data-lucide="user"></i>
+        <span>내정보</span>
+      </div>
+    </nav>
+
+  </div>
+
+  <!-- Leaflet Map JS CDN -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- ====================================================
+       APPLICATION LOGIC & DATABASE SIMULATOR
+       ==================================================== -->
+  <script>
+    // --------------------------------------------------
+    // 1. DATA STATE DEFINITIONS & SEED DATABASE
+    // --------------------------------------------------
+    const MOCK_MATEDB = {
+      mockMates: [
+        {
+          id: "mock_1",
+          name: "김지우",
+          sid: "23학번",
+          dept: "컴퓨터공학과",
+          email: "jiwoo@univ.ac.kr",
+          avatar: "🤖",
+          coords: [37.5623, 126.9360], // Engineering Hall
+          classes: [
+            { id: "c_m1_1", name: "자료구조", professor: "이교수", classroom: "공학관 202호", day: 0, startTime: "09:00", endTime: "10:15" },
+            { id: "c_m1_2", name: "컴퓨터구조", professor: "박교수", classroom: "공학관 101호", day: 0, startTime: "13:00", endTime: "14:15" },
+            { id: "c_m1_3", name: "데이터베이스", professor: "최교수", classroom: "공학관 410호", day: 2, startTime: "11:00", endTime: "12:15" },
+            { id: "c_m1_4", name: "운영체제", professor: "한교수", classroom: "공학관 204호", day: 2, startTime: "15:00", endTime: "16:15" }
+          ],
+          preferredActivities: {
+            "0": { activity: "식사", location: "학생회관 맛나샘" },
+            "2": { activity: "카페", location: "공학관 카페" }
+          }
+        },
+        {
+          id: "mock_2",
+          name: "박수현",
+          sid: "22학번",
+          dept: "경영학과",
+          email: "suhyun@univ.ac.kr",
+          avatar: "📈",
+          coords: [37.5601, 126.9392], // Business School Hall
+          classes: [
+            { id: "c_m2_1", name: "마케팅원론", professor: "정교수", classroom: "경영관 103호", day: 0, startTime: "11:00", endTime: "12:15" },
+            { id: "c_m2_2", name: "재무관리", professor: "조교수", classroom: "경영관 B102호", day: 0, startTime: "15:00", endTime: "16:15" },
+            { id: "c_m2_3", name: "회계원리", professor: "김교수", classroom: "경영관 205호", day: 1, startTime: "09:00", endTime: "10:15" },
+            { id: "c_m2_4", name: "기업윤리", professor: "윤교수", classroom: "경영관 403호", day: 1, startTime: "13:00", endTime: "14:15" }
+          ],
+          preferredActivities: {
+            "0": { activity: "공부", location: "중앙도서관 열람실" },
+            "1": { activity: "식사", location: "학관 푸드코트" }
+          }
+        },
+        {
+          id: "mock_3",
+          name: "이민재",
+          sid: "24학번",
+          dept: "산업디자인학과",
+          email: "minjae@univ.ac.kr",
+          avatar: "🎨",
+          coords: [37.5631, 126.9351], // Design Hall
+          classes: [
+            { id: "c_m3_1", name: "기초입체", professor: "강교수", classroom: "디자인관 502호", day: 1, startTime: "11:00", endTime: "12:15" },
+            { id: "c_m3_2", name: "타이포그래피", professor: "신교수", classroom: "디자인관 실습실", day: 1, startTime: "14:00", endTime: "15:15" },
+            { id: "c_m3_3", name: "디자인론", professor: "유교수", classroom: "디자인관 102호", day: 3, startTime: "09:00", endTime: "10:15" },
+            { id: "c_m3_4", name: "컴퓨터그래픽스", professor: "권교수", classroom: "디자인관 실습실", day: 3, startTime: "12:00", endTime: "13:15" }
+          ],
+          preferredActivities: {
+            "1": { activity: "산책", location: "청송대 백양로" },
+            "3": { activity: "카페", location: "대강당 커피숍" }
+          }
+        },
+        {
+          id: "mock_4",
+          name: "최다은",
+          sid: "23학번",
+          dept: "화학과",
+          email: "daeun@univ.ac.kr",
+          avatar: "🧪",
+          coords: [37.5611, 126.9362], // Science Hall
+          classes: [
+            { id: "c_m4_1", name: "유기화학", professor: "송교수", classroom: "과학관 403호", day: 2, startTime: "09:00", endTime: "10:15" },
+            { id: "c_m4_2", name: "분석화학실험", professor: "허교수", classroom: "과학관 실험실", day: 2, startTime: "13:00", endTime: "14:15" },
+            { id: "c_m4_3", name: "무기화학", professor: "양교수", classroom: "과학관 201호", day: 4, startTime: "10:00", endTime: "11:15" },
+            { id: "c_m4_4", name: "물리화학실험", professor: "백교수", classroom: "과학관 실험실", day: 4, startTime: "14:00", endTime: "15:15" }
+          ],
+          preferredActivities: {
+            "2": { activity: "공부", location: "이과대 1층 스터디룸" },
+            "4": { activity: "식사", location: "학생회관 푸드코트" }
+          }
+        }
+      ]
+    };
+
+    let state = {
+      users: [],
+      timetables: [],
+      freeTimes: [],
+      matches: [],
+      chats: [],
+      currentUser: null,
+      userCoords: [37.5615, 126.9375], // Fictional campus center (Yonsei Univ)
+      activeTab: 'home',
+      activeFilterFreeSlotId: null,
+      activeFilterActivity: '식사'
+    };
+
+    // Initialize LocalStorage database
+    function initLocalStorage() {
+      const savedState = localStorage.getItem('akikoma_db');
+      if (savedState) {
+        try {
+          state = JSON.parse(savedState);
+          // ensure initial user coordinate exists
+          if (!state.userCoords) {
+            state.userCoords = [37.5615, 126.9375];
+          }
+        } catch (e) {
+          console.error("Failed to parse LocalStorage database, reseeding.", e);
+          reseedDatabase();
+        }
+      } else {
+        reseedDatabase();
+      }
+    }
+
+    function saveState() {
+      localStorage.setItem('akikoma_db', JSON.stringify(state));
+    }
+
+    function reseedDatabase() {
+      state.users = [
+        { id: "student_default", name: "김아키", email: "student@univ.ac.kr", password: "password123", dept: "컴퓨터공학과", sid: "23학번", school: "연세대학교", isVerified: true, verifiedDoc: "student_id.png" }
+      ];
+      // Default classes for default user
+      state.timetables = [
+        { id: "c_df_1", userId: "student_default", name: "컴퓨터 네트워크", professor: "이네트 교수님", classroom: "공학관 301호", day: 0, startTime: "09:00", endTime: "10:15" },
+        { id: "c_df_2", userId: "student_default", name: "인공지능 개론", professor: "박머신 교수님", classroom: "공학관 502호", day: 0, startTime: "13:00", endTime: "14:15" },
+        { id: "c_df_3", userId: "student_default", name: "웹 프로그래밍", professor: "김코딩 교수님", classroom: "공학관 B101호", day: 2, startTime: "10:00", endTime: "11:15" },
+        { id: "c_df_4", userId: "student_default", name: "공학수학", professor: "수학 교수님", classroom: "과학관 101호", day: 2, startTime: "14:00", endTime: "15:15" }
+      ];
+      state.userCoords = [37.5615, 126.9375];
+      state.matches = [];
+      state.chats = [];
+      state.currentUser = null;
+      saveState();
+      // recalculate all
+      recalculateFreeTimes("student_default");
+    }
+
+    // --------------------------------------------------
+    // 2. TIMETABLE HOUR SELECTS GENERATOR
+    // --------------------------------------------------
+    function setupHourDropdowns() {
+      const startSelect = document.getElementById('class-start');
+      const endSelect = document.getElementById('class-end');
+      
+      startSelect.innerHTML = '';
+      endSelect.innerHTML = '';
+
+      // Gen hourly options 08:00 to 20:00 at 30 min intervals
+      for (let h = 8; h <= 20; h++) {
+        for (let m of ['00', '30']) {
+          if (h === 20 && m === '30') break;
+          const timeStr = `${h.toString().padStart(2, '0')}:${m}`;
+          
+          const opt1 = document.createElement('option');
+          opt1.value = timeStr;
+          opt1.textContent = timeStr;
+          startSelect.appendChild(opt1);
+
+          const opt2 = document.createElement('option');
+          opt2.value = timeStr;
+          opt2.textContent = timeStr;
+          endSelect.appendChild(opt2);
+        }
+      }
+      
+      // Auto-offset end time by 1h15m when starting time changes (default college class duration)
+      startSelect.addEventListener('change', () => {
+        const val = startSelect.value;
+        const [h, m] = val.split(':').map(Number);
+        let endH = h + 1;
+        let endM = m + 15;
+        if (endM >= 60) {
+          endH += 1;
+          endM -= 60;
+        }
+        if (endH > 20) {
+          endH = 20;
+          endM = 0;
+        }
+        const targetStr = `${endH.toString().padStart(2, '0')}:${endM.toString().padStart(2, '0')}`;
+        endSelect.value = targetStr;
+      });
+      
+      // trigger initial change
+      startSelect.dispatchEvent(new Event('change'));
+    }
+
+    // --------------------------------------------------
+    // 3. FREE TIME AUTO CALCULATION ALGORITHM
+    // --------------------------------------------------
+    function timeToMinutes(timeStr) {
+      const [h, m] = timeStr.split(':').map(Number);
+      return h * 60 + m;
+    }
+
+    function minutesToTime(mins) {
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+    }
+
+    function recalculateFreeTimes(userId) {
+      // Filter out only user's classes
+      const userClasses = state.timetables.filter(c => c.userId === userId);
+      const computedFreeTimes = [];
+
+      // Day indices 0 to 4 (Mon-Fri)
+      for (let day = 0; day < 5; day++) {
+        // Find classes for this day, sorted chronologically
+        const dayClasses = userClasses.filter(c => c.day === Number(day))
+          .sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
+
+        let currentMin = timeToMinutes("08:00");
+        const limitMin = timeToMinutes("20:00");
+
+        for (let c of dayClasses) {
+          const classStartM = timeToMinutes(c.startTime);
+          const classEndM = timeToMinutes(c.endTime);
+
+          if (classStartM > currentMin) {
+            const gap = classStartM - currentMin;
+            // Gap must be at least 30 minutes to count as empty slot
+            if (gap >= 30) {
+              computedFreeTimes.push({
+                id: `free_${day}_${currentMin}_${classStartM}`,
+                userId: userId,
+                day: day,
+                startTime: minutesToTime(currentMin),
+                endTime: minutesToTime(classStartM)
+              });
+            }
+          }
+          currentMin = Math.max(currentMin, classEndM);
+        }
+
+        // Check gap after last class until 20:00
+        if (currentMin < limitMin) {
+          const gap = limitMin - currentMin;
+          if (gap >= 30) {
+            computedFreeTimes.push({
+              id: `free_${day}_${currentMin}_${limitMin}`,
+              userId: userId,
+              day: day,
+              startTime: minutesToTime(currentMin),
+              endTime: minutesToTime(limitMin)
+            });
+          }
+        }
+      }
+
+      // Update state and save
+      state.freeTimes = state.freeTimes.filter(f => f.userId !== userId).concat(computedFreeTimes);
+      saveState();
+    }
+
+    // --------------------------------------------------
+    // 4. MAP INTEGRATION (LEAFLET.JS)
+    // --------------------------------------------------
+    let map = null;
+    let userMarker = null;
+    let mateMarkers = [];
+
+    function initMap() {
+      if (map) return;
+      
+      // Initialize map centered around Yonsei University center
+      map = L.map('map', {
+        zoomControl: false,
+        attributionControl: false
+      }).setView(state.userCoords, 16);
+
+      // OpenStreetMap Tiles
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19
+      }).addTo(map);
+
+      // Drag pin to set position, click anywhere on map to reposition
+      map.on('click', function(e) {
+        const lat = e.latlng.lat;
+        const lng = e.latlng.lng;
+        
+        state.userCoords = [lat, lng];
+        saveState();
+        updateMapMarkers();
+        
+        // Triggers match list distance recalculation dynamically
+        renderMatches();
+        showToast("나의 현재 위치 핀이 성공적으로 업데이트되었습니다.", "success");
+      });
+      
+      updateMapMarkers();
+    }
+
+    function updateMapMarkers() {
+      if (!map) return;
+
+      // Clean existing markers
+      if (userMarker) {
+        map.removeLayer(userMarker);
+      }
+      mateMarkers.forEach(m => map.removeLayer(m));
+      mateMarkers = [];
+
+      // Draw custom pulse icon for current user
+      const userIcon = L.divIcon({
+        className: 'custom-div-icon',
+        html: '<div class="pulse-marker user"></div>',
+        iconSize: [20, 20],
+        iconAnchor: [10, 10]
+      });
+
+      userMarker = L.marker(state.userCoords, { icon: userIcon }).addTo(map);
+      userMarker.bindTooltip("나의 현재 설정 위치", { permanent: true, direction: 'top', className: 'user-tooltip', offset: [0, -10] });
+
+      // Draw active/filtered mate markers
+      const activeFreeSlotId = state.activeFilterFreeSlotId;
+      const activeActivity = state.activeFilterActivity;
+      
+      if (!activeFreeSlotId) return;
+      const freeSlotObj = state.freeTimes.find(f => f.id === activeFreeSlotId);
+      if (!freeSlotObj) return;
+
+      // Find overlap mates
+      const mates = findOverlappingMates(freeSlotObj, activeActivity);
+      
+      mates.forEach(m => {
+        const mateIcon = L.divIcon({
+          className: 'custom-div-icon',
+          html: '<div class="pulse-marker mate"></div>',
+          iconSize: [20, 20],
+          iconAnchor: [10, 10]
+        });
+
+        const distance = calculateDistance(state.userCoords, m.coords);
+        const marker = L.marker(m.coords, { icon: mateIcon }).addTo(map);
+        marker.bindTooltip(`${m.name} (${m.dept}) - ${Math.round(distance)}m`, { direction: 'top', offset: [0, -10] });
+        
+        mateMarkers.push(marker);
+      });
+    }
+
+    // Distance computation (Haversine formula)
+    function calculateDistance(coords1, coords2) {
+      const [lat1, lon1] = coords1;
+      const [lat2, lon2] = coords2;
+      const R = 6371e3; // Earth radius in meters
+      const phi1 = lat1 * Math.PI/180;
+      const phi2 = lat2 * Math.PI/180;
+      const deltaPhi = (lat2-lat1) * Math.PI/180;
+      const deltaLambda = (lon2-lon1) * Math.PI/180;
+
+      const a = Math.sin(deltaPhi/2) * Math.sin(deltaPhi/2) +
+                Math.cos(phi1) * Math.cos(phi2) *
+                Math.sin(deltaLambda/2) * Math.sin(deltaLambda/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+      return R * c; // in meters
+    }
+
+    // --------------------------------------------------
+    // 5. MOCK MATE MATCHING LOGIC
+    // --------------------------------------------------
+    function findOverlappingMates(userFreeSlot, activityType) {
+      const results = [];
+      const userStartM = timeToMinutes(userFreeSlot.startTime);
+      const userEndM = timeToMinutes(userFreeSlot.endTime);
+      const day = Number(userFreeSlot.day);
+
+      MOCK_MATEDB.mockMates.forEach(m => {
+        // Calculate mock mate's free slots
+        const computedMateFree = [];
+        const dayClasses = m.classes.filter(c => c.day === day)
+          .sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
+
+        let currentMin = timeToMinutes("08:00");
+        const limitMin = timeToMinutes("20:00");
+
+        for (let c of dayClasses) {
+          const classStartM = timeToMinutes(c.startTime);
+          const classEndM = timeToMinutes(c.endTime);
+
+          if (classStartM > currentMin) {
+            const gap = classStartM - currentMin;
+            if (gap >= 30) {
+              computedMateFree.push({ startTime: minutesToTime(currentMin), endTime: minutesToTime(classStartM) });
+            }
+          }
+          currentMin = Math.max(currentMin, classEndM);
+        }
+        if (currentMin < limitMin) {
+          const gap = limitMin - currentMin;
+          if (gap >= 30) {
+            computedMateFree.push({ startTime: minutesToTime(currentMin), endTime: minutesToTime(limitMin) });
+          }
+        }
+
+        // Check if any computed free slot overlaps with user's slot
+        for (let slot of computedMateFree) {
+          const mateStartM = timeToMinutes(slot.startTime);
+          const mateEndM = timeToMinutes(slot.endTime);
+
+          // Overlap calculation: max(start) < min(end)
+          const maxStart = Math.max(userStartM, mateStartM);
+          const minEnd = Math.min(userEndM, mateEndM);
+
+          if (maxStart < minEnd && (minEnd - maxStart) >= 30) {
+            // Check if mate is interested in this activity on this day
+            const actObj = m.preferredActivities[day];
+            if (actObj && actObj.activity === activityType) {
+              results.push({
+                ...m,
+                overlapSlot: {
+                  startTime: minutesToTime(maxStart),
+                  endTime: minutesToTime(minEnd),
+                  activity: actObj.activity,
+                  location: actObj.location
+                }
+              });
+              break;
+            }
+          }
+        }
+      });
+
+      return results;
+    }
+
+    // --------------------------------------------------
+    // 6. RENDERERS & NAVIGATION CONTROLLER
+    // --------------------------------------------------
+    function switchTab(tabId) {
+      if (!state.currentUser) {
+        showAuthView();
+        return;
+      }
+
+      state.activeTab = tabId;
+      
+      // Update Tab Navigation Active State UI
+      document.querySelectorAll('.nav-item').forEach(el => {
+        el.classList.remove('active');
+        const iconSpan = el.querySelector('span').textContent;
+        const mapping = { '홈': 'home', '시간표': 'timetable', '메이트': 'match', '채팅': 'chat', '내정보': 'profile' };
+        if (mapping[iconSpan] === tabId) {
+          el.classList.add('active');
+        }
+      });
+
+      // Update Views Display
+      document.querySelectorAll('.view-tab').forEach(el => {
+        el.classList.remove('active');
+      });
+      
+      const targetView = document.getElementById(`view-${tabId}`);
+      if (targetView) {
+        targetView.classList.add('active');
+      }
+
+      // Tab Specific Initializations
+      if (tabId === 'home') {
+        renderHomeDashboard();
+      } else if (tabId === 'timetable') {
+        renderTimetable();
+      } else if (tabId === 'match') {
+        setTimeout(() => {
+          initMap();
+          // Resize leaflet to container size
+          if (map) {
+            map.invalidateSize();
+          }
+          renderMatchFilterOptions();
+          renderMatches();
+          updateMapMarkers();
+        }, 150);
+      } else if (tabId === 'chat') {
+        renderChatRooms();
+      } else if (tabId === 'profile') {
+        renderProfile();
+      }
+      
+      checkVerificationState();
+    }
+
+    // --- Verification locks and Admin approval simulator ---
+    function checkVerificationState() {
+      const user = state.currentUser;
+      if (!user) return;
+
+      const warningCard = document.getElementById('home-verify-warning');
+      const matchLock = document.getElementById('match-lock-overlay');
+      const chatLock = document.getElementById('chat-lock-overlay');
+      const verifyBadge = document.getElementById('profile-verify-status');
+
+      if (user.isVerified) {
+        if (warningCard) warningCard.style.display = 'none';
+        if (matchLock) matchLock.style.display = 'none';
+        if (chatLock) chatLock.style.display = 'none';
+        if (verifyBadge) {
+          verifyBadge.textContent = "재학 인증 완료 (" + (user.verifiedDoc.includes("id") ? "학생증" : "합격증") + ")";
+          verifyBadge.parentElement.style.color = "var(--accent)";
+          verifyBadge.parentElement.style.background = "var(--accent-soft)";
+          verifyBadge.parentElement.style.borderColor = "rgba(20, 184, 166, 0.2)";
+        }
+      } else {
+        if (warningCard) warningCard.style.display = 'block';
+        if (matchLock) matchLock.style.display = 'flex';
+        if (chatLock) chatLock.style.display = 'flex';
+        if (verifyBadge) {
+          verifyBadge.textContent = "인증 대기 중 (검토 진행 중)";
+          verifyBadge.parentElement.style.color = "#a16207";
+          verifyBadge.parentElement.style.background = "#fef9c3";
+          verifyBadge.parentElement.style.borderColor = "rgba(234, 179, 8, 0.2)";
+        }
+      }
+    }
+
+    window.simulateAdminApproval = function() {
+      if (!state.currentUser) return;
+      
+      state.currentUser.isVerified = true;
+      
+      const userIndex = state.users.findIndex(u => u.id === state.currentUser.id);
+      if (userIndex !== -1) {
+        state.users[userIndex].isVerified = true;
+      }
+      
+      saveState();
+      
+      showToast("🎉 재학 인증 심사가 승인되었습니다! 모든 서비스를 정상 이용할 수 있습니다.", "success");
+      
+      checkVerificationState();
+      switchTab(state.activeTab);
+      lucide.createIcons();
+    };
+
+    // --- Toast Alerts ---
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-holder');
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.innerHTML = `
+        <i data-lucide="${type === 'success' ? 'check-circle' : 'info'}" style="width:16px; height:16px;"></i>
+        <span>${message}</span>
+        <button class="toast-close"><i data-lucide="x" style="width:14px; height:14px;"></i></button>
+      `;
+      container.appendChild(toast);
+      lucide.createIcons();
+
+      toast.querySelector('.toast-close').addEventListener('click', () => {
+        toast.remove();
+      });
+
+      // Auto dismiss
+      setTimeout(() => {
+        toast.style.animation = "toast-intro 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) reverse forwards";
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
+    // --- Home/Dashboard Renderer ---
+    function renderHomeDashboard() {
+      const greeting = document.getElementById('home-greeting');
+      greeting.textContent = `안녕하세요, ${state.currentUser.name}님! 👋`;
+
+      const timelineBox = document.getElementById('home-timeline');
+      timelineBox.innerHTML = '';
+
+      // Get user classes & computed free times for today
+      // For demo purposes, we will treat Monday (Day 0) as "오늘" (Today) to show seeded demo schedules
+      const todayDay = 0; // Mon
+      const userClasses = state.timetables.filter(c => c.userId === state.currentUser.id && c.day === todayDay)
+        .sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
+      const userFree = state.freeTimes.filter(f => f.userId === state.currentUser.id && f.day === todayDay)
+        .sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
+
+      // Merge both chronologically
+      const todayTimeline = [];
+      userClasses.forEach(c => todayTimeline.push({ type: 'class', obj: c, timeMin: timeToMinutes(c.startTime) }));
+      userFree.forEach(f => todayTimeline.push({ type: 'free', obj: f, timeMin: timeToMinutes(f.startTime) }));
+      todayTimeline.sort((a, b) => a.timeMin - b.timeMin);
+
+      if (todayTimeline.length === 0) {
+        timelineBox.innerHTML = `
+          <div class="empty-state">
+            <i data-lucide="calendar"></i>
+            <p class="muted">오늘 등록된 시간표 일정이 없습니다.<br>시간표 탭에서 요일별 수업을 추가해보세요!</p>
+            <button class="btn btn-secondary" onclick="switchTab('timetable')" style="margin-top: 12px; font-size:12px; padding:8px 16px;">수업 추가하기 📅</button>
+          </div>
+        `;
+        lucide.createIcons();
+      } else {
+        todayTimeline.forEach(item => {
+          const div = document.createElement('div');
+          div.className = 'timeline-item';
+          
+          if (item.type === 'class') {
+            div.innerHTML = `
+              <div class="timeline-icon class"><i data-lucide="book-open" style="width:14px; height:14px;"></i></div>
+              <div class="timeline-detail">
+                <div class="timeline-title">${item.obj.name}</div>
+                <div class="timeline-subtitle">${item.obj.startTime} - ${item.obj.endTime} · ${item.obj.classroom} (${item.obj.professor})</div>
+              </div>
+            `;
+          } else {
+            div.innerHTML = `
+              <div class="timeline-icon free"><i data-lucide="sparkles" style="width:14px; height:14px;"></i></div>
+              <div class="timeline-detail">
+                <div class="timeline-title" style="color:var(--primary-dark);">공강 시간 (${item.obj.startTime} - ${item.obj.endTime})</div>
+                <div class="timeline-subtitle">공강 메이트를 탐색할 수 있는 슬롯입니다.</div>
+              </div>
+            `;
+          }
+          timelineBox.appendChild(div);
+        });
+        lucide.createIcons();
+      }
+
+      // Matching Requests list
+      const requestsBox = document.getElementById('home-match-requests');
+      requestsBox.innerHTML = '';
+
+      const userMatches = state.matches.filter(m => m.requesterId === state.currentUser.id || m.recipientId === state.currentUser.id);
+      
+      if (userMatches.length === 0) {
+        requestsBox.innerHTML = '<p class="muted" style="text-align:center; padding: 12px 0; font-size:12px;">진행 중인 매칭 요청이 없습니다.</p>';
+      } else {
+        userMatches.forEach(m => {
+          const isSent = m.requesterId === state.currentUser.id;
+          const otherUserId = isSent ? m.recipientId : m.requesterId;
+          const otherMate = MOCK_MATEDB.mockMates.find(x => x.id === otherUserId) || state.users.find(x => x.id === otherUserId);
+          
+          if (!otherMate) return;
+
+          const dayNames = ['월', '화', '수', '목', '금'];
+          const div = document.createElement('div');
+          div.style.background = 'white';
+          div.style.padding = '12px 16px';
+          div.style.borderRadius = '16px';
+          div.style.border = '1px solid var(--glass-border)';
+          div.style.display = 'flex';
+          div.style.justifyContent = 'space-between';
+          div.style.alignItems = 'center';
+
+          let statusTag = '';
+          if (m.status === 'pending') {
+            statusTag = `<span style="font-size:11px; font-weight:700; color:#eab308; background:#fef9c3; padding:2px 8px; border-radius:8px;">대기중</span>`;
+          } else if (m.status === 'accepted') {
+            statusTag = `<span style="font-size:11px; font-weight:700; color:#14b8a6; background:#ccfbf1; padding:2px 8px; border-radius:8px;">수락됨</span>`;
+          } else {
+            statusTag = `<span style="font-size:11px; font-weight:700; color:#ef4444; background:#fee2e2; padding:2px 8px; border-radius:8px;">거절됨</span>`;
+          }
+
+          div.innerHTML = `
+            <div>
+              <div style="font-weight:700; font-size:13px;">${otherMate.name} (${otherMate.dept})</div>
+              <div style="font-size:11px; color:var(--neutral-muted); margin-top:2px;">
+                ${dayNames[m.day]}요일 ${m.startTime}-${m.endTime} · ${m.activity} (${m.location})
+              </div>
+            </div>
+            <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+              ${statusTag}
+              ${m.status === 'accepted' ? `<button class="btn btn-primary" onclick="openChatRoom('${m.id}')" style="padding:4px 8px; font-size:11px; width:auto; border-radius:8px;">채팅하기</button>` : ''}
+            </div>
+          `;
+          requestsBox.appendChild(div);
+        });
+      }
+    }
+
+    // --- Timetable Tab Renderer ---
+    function renderTimetable() {
+      // Clear cells
+      document.querySelectorAll('.timetable-day-col').forEach(col => col.innerHTML = '');
+
+      // Load active classes
+      const activeClasses = state.timetables.filter(c => c.userId === state.currentUser.id);
+      
+      activeClasses.forEach(c => {
+        const col = document.querySelector(`.timetable-day-col[data-day="${c.day}"]`);
+        if (!col) return;
+
+        const startM = timeToMinutes(c.startTime);
+        const endM = timeToMinutes(c.endTime);
+        const limitMin = timeToMinutes("08:00");
+        
+        // Calculate offset Top & Height based on: 1 hour (60 min) = 48px height. Grid starts at 08:00
+        const offsetTop = ((startM - limitMin) / 60) * 48;
+        const blockHeight = ((endM - startM) / 60) * 48;
+
+        const block = document.createElement('div');
+        block.className = 'class-block';
+        block.style.top = `${offsetTop}px`;
+        block.style.height = `${blockHeight}px`;
+        
+        block.innerHTML = `
+          <div class="class-block-title">${c.name}</div>
+          <div>
+            <div class="class-block-info">${c.classroom}</div>
+            <div class="class-block-info">${c.professor}</div>
+          </div>
+        `;
+
+        // Click on class block to prompt delete
+        block.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (confirm(`[수업 삭제] "${c.name}" 수업을 시간표에서 삭제하시겠습니까?`)) {
+            deleteClass(c.id);
+          }
+        });
+
+        col.appendChild(block);
+      });
+
+      // Display Free hours slots list
+      const freeSlotsBox = document.getElementById('timetable-free-slots');
+      freeSlotsBox.innerHTML = '';
+
+      const userFree = state.freeTimes.filter(f => f.userId === state.currentUser.id)
+        .sort((a, b) => (a.day * 1440 + timeToMinutes(a.startTime)) - (b.day * 1440 + timeToMinutes(b.startTime)));
+
+      const dayNames = ['월요일', '화요일', '수요일', '목요일', '금요일'];
+      if (userFree.length === 0) {
+        freeSlotsBox.innerHTML = '<p class="muted" style="text-align:center; padding:12px 0;">시간표가 꽉 찼거나 등록된 수업이 없습니다.</p>';
+      } else {
+        userFree.forEach(f => {
+          const div = document.createElement('div');
+          div.style.background = 'white';
+          div.style.padding = '10px 16px';
+          div.style.borderRadius = '16px';
+          div.style.border = '1px solid var(--glass-border)';
+          div.style.display = 'flex';
+          div.style.justifyContent = 'space-between';
+          div.style.alignItems = 'center';
+          div.innerHTML = `
+            <div>
+              <span style="font-weight:800; color:var(--primary-dark); font-size:13px;">${dayNames[f.day]}</span>
+              <span style="font-weight:700; color:var(--neutral-dark); font-size:13px; margin-left:8px;">${f.startTime} ~ ${f.endTime}</span>
+            </div>
+            <button class="btn btn-primary" onclick="switchToMatchTabWithSlot('${f.id}')" style="width:auto; padding:6px 12px; font-size:11px; border-radius:10px;">메이트 매칭</button>
+          `;
+          freeSlotsBox.appendChild(div);
+        });
+      }
+    }
+
+    // Redirect to match with preset active slot
+    window.switchToMatchTabWithSlot = function(freeSlotId) {
+      state.activeFilterFreeSlotId = freeSlotId;
+      switchTab('match');
+    };
+
+    // Delete a class
+    function deleteClass(classId) {
+      state.timetables = state.timetables.filter(c => c.id !== classId);
+      saveState();
+      recalculateFreeTimes(state.currentUser.id);
+      renderTimetable();
+      showToast("수업이 성공적으로 시간표에서 삭제되었습니다.", "success");
+    }
+
+    // --- Match Tab filter options loader ---
+    function renderMatchFilterOptions() {
+      const select = document.getElementById('match-slot-select');
+      select.innerHTML = '';
+
+      const userFree = state.freeTimes.filter(f => f.userId === state.currentUser.id)
+        .sort((a, b) => (a.day * 1440 + timeToMinutes(a.startTime)) - (b.day * 1440 + timeToMinutes(b.startTime)));
+
+      const dayNames = ['월', '화', '수', '목', '금'];
+      
+      if (userFree.length === 0) {
+        const opt = document.createElement('option');
+        opt.value = "";
+        opt.textContent = "계산된 공강 시간이 없습니다.";
+        select.appendChild(opt);
+        state.activeFilterFreeSlotId = null;
+      } else {
+        userFree.forEach(f => {
+          const opt = document.createElement('option');
+          opt.value = f.id;
+          opt.textContent = `${dayNames[f.day]}요일 ${f.startTime} ~ ${f.endTime}`;
+          select.appendChild(opt);
+        });
+
+        // Retain selection if valid, else pick first
+        if (!state.activeFilterFreeSlotId || !userFree.find(f => f.id === state.activeFilterFreeSlotId)) {
+          state.activeFilterFreeSlotId = userFree[0].id;
+        }
+        select.value = state.activeFilterFreeSlotId;
+      }
+    }
+
+    // --- Search Mates results renderer ---
+    function renderMatches() {
+      const resultsBox = document.getElementById('match-results-box');
+      resultsBox.innerHTML = '';
+
+      const selectVal = document.getElementById('match-slot-select').value;
+      state.activeFilterFreeSlotId = selectVal;
+      
+      if (!selectVal) {
+        resultsBox.innerHTML = '<p class="muted" style="text-align:center; padding:20px 0;">시간표 탭에서 수업을 등록하여 먼저 공강을 확보하세요.</p>';
+        return;
+      }
+
+      const freeSlotObj = state.freeTimes.find(f => f.id === selectVal);
+      if (!freeSlotObj) return;
+
+      const mates = findOverlappingMates(freeSlotObj, state.activeFilterActivity);
+
+      if (mates.length === 0) {
+        resultsBox.innerHTML = `
+          <div class="empty-state" style="padding: 16px 0;">
+            <i data-lucide="info" style="width:32px; height:32px;"></i>
+            <p class="muted" style="font-size:12px;">이 공강 시간에 "${state.activeFilterActivity}" 활동을 희망하는 학우가 없습니다.<br>다른 희망 활동을 탭해보세요!</p>
+          </div>
+        `;
+        lucide.createIcons();
+      } else {
+        mates.forEach(m => {
+          const distance = calculateDistance(state.userCoords, m.coords);
+          const div = document.createElement('div');
+          div.className = 'mate-item';
+
+          // Check if match request already exists
+          const existingMatch = state.matches.find(match => 
+            (match.requesterId === state.currentUser.id && match.recipientId === m.id && match.day === Number(freeSlotObj.day) && match.startTime === freeSlotObj.startTime)
+          );
+
+          let actionBtn = '';
+          if (existingMatch) {
+            if (existingMatch.status === 'pending') {
+              actionBtn = `<button class="btn btn-secondary" style="font-size:11px; padding:6px 12px; width:auto; border-radius:10px; cursor:default;" disabled>대기중</button>`;
+            } else if (existingMatch.status === 'accepted') {
+              actionBtn = `<button class="btn btn-primary" onclick="openChatRoom('${existingMatch.id}')" style="font-size:11px; padding:6px 12px; width:auto; border-radius:10px;">채팅</button>`;
+            }
+          } else {
+            actionBtn = `<button class="btn btn-primary" onclick="openMatchModal('${m.id}')" style="font-size:11px; padding:6px 12px; width:auto; border-radius:10px;">신청</button>`;
+          }
+
+          div.innerHTML = `
+            <div class="mate-avatar">${m.avatar}</div>
+            <div class="mate-info">
+              <div class="mate-name">${m.name} <span style="font-weight:500; font-size:11px; color:var(--neutral-muted);">${m.sid}</span></div>
+              <div class="mate-dept">${m.dept}</div>
+              <div class="mate-distance">
+                <i data-lucide="navigation" style="width:10px; height:10px;"></i>
+                나와 약 ${Math.round(distance)}m 거리 (${m.preferredActivities[freeSlotObj.day].location})
+              </div>
+            </div>
+            <div class="mate-action">
+              ${actionBtn}
+            </div>
+          `;
+          resultsBox.appendChild(div);
+        });
+        lucide.createIcons();
+      }
+    }
+
+    // --- Chatrooms View Renderer ---
+    function renderChatRooms() {
+      const box = document.getElementById('chatrooms-box');
+      box.innerHTML = '';
+
+      // Get accepted match items
+      const chatMatches = state.matches.filter(m => (m.requesterId === state.currentUser.id || m.recipientId === state.currentUser.id) && m.status === 'accepted');
+
+      if (chatMatches.length === 0) {
+        box.innerHTML = `
+          <div class="empty-state">
+            <i data-lucide="message-square-dashed"></i>
+            <p class="muted">개설된 채팅방이 없습니다.<br>공강 시간대에 메이트를 탐색하고 매칭을 신청해 보세요!</p>
+          </div>
+        `;
+        lucide.createIcons();
+      } else {
+        chatMatches.forEach(m => {
+          const otherUserId = m.requesterId === state.currentUser.id ? m.recipientId : m.requesterId;
+          const otherMate = MOCK_MATEDB.mockMates.find(x => x.id === otherUserId) || state.users.find(x => x.id === otherUserId);
+          if (!otherMate) return;
+
+          // Get last message in chatroom
+          const messages = state.chats.filter(c => c.matchId === m.id);
+          const lastMsg = messages.length > 0 ? messages[messages.length - 1].message : "매칭 수락 완료! 대화를 시작해보세요.";
+          const lastTime = messages.length > 0 ? messages[messages.length - 1].timestamp : "";
+
+          const div = document.createElement('div');
+          div.className = 'chatroom-item';
+          div.addEventListener('click', () => openChatRoom(m.id));
+
+          div.innerHTML = `
+            <div class="mate-avatar" style="font-size: 18px;">${otherMate.avatar || '🎓'}</div>
+            <div class="chatroom-details">
+              <div class="chatroom-title">
+                <span>${otherMate.name} (${otherMate.dept})</span>
+                <span class="chatroom-time">${lastTime}</span>
+              </div>
+              <div class="chatroom-msg">${lastMsg}</div>
+            </div>
+          `;
+          box.appendChild(div);
+        });
+      }
+    }
+
+    // --- Profile View Renderer ---
+    function renderProfile() {
+      const user = state.currentUser;
+      if (!user) return;
+
+      document.getElementById('profile-avatar-lbl').textContent = user.name[0];
+      document.getElementById('profile-name-lbl').textContent = user.name;
+      document.getElementById('profile-dept-lbl').textContent = `${user.school} · ${user.dept}`;
+      document.getElementById('profile-sid-lbl').textContent = user.sid;
+      document.getElementById('profile-email-lbl').textContent = user.email;
+      
+      const verifiedStatus = user.isVerified ? "재학 인증 완료 (" + (user.verifiedDoc.includes("id") ? "학생증" : "합격증") + ")" : "대기 중";
+      document.getElementById('profile-verify-status').textContent = verifiedStatus;
+      document.getElementById('profile-doc-lbl').textContent = user.verifiedDoc;
+    }
+
+    // --------------------------------------------------
+    // 7. INTERACTIVE CHAT PANEL & CHATBOT MECHANICS
+    // --------------------------------------------------
+    let activeChatMatchId = null;
+    let chatMinimap = null;
+    let chatUserMarker = null;
+    let chatMateMarker = null;
+    let chatDistanceLine = null;
+
+    function openChatRoom(matchId) {
+      const matchObj = state.matches.find(m => m.id === matchId);
+      if (!matchObj) return;
+
+      activeChatMatchId = matchId;
+      const otherUserId = matchObj.requesterId === state.currentUser.id ? matchObj.recipientId : matchObj.requesterId;
+      const otherMate = MOCK_MATEDB.mockMates.find(x => x.id === otherUserId) || state.users.find(x => x.id === otherUserId);
+      if (!otherMate) return;
+
+      // Update UI title details
+      const distance = calculateDistance(state.userCoords, otherMate.coords);
+      document.getElementById('chat-mate-name').textContent = `${otherMate.name} 학우`;
+      document.getElementById('chat-mate-status').textContent = `${otherMate.dept} · 만남 선호장소: ${matchObj.location} (${Math.round(distance)}m)`;
+
+      // Display chat panel overlay
+      const chatPanel = document.getElementById('chat-conversation-panel');
+      chatPanel.style.display = 'flex';
+
+      // Load Messages
+      renderChatMessages();
+
+      // Mini map integration inside chat
+      setTimeout(() => {
+        initChatMinimap(otherMate.coords);
+      }, 100);
+    }
+
+    function initChatMinimap(mateCoords) {
+      const container = document.getElementById('chat-minimap');
+      
+      // Clean previous map instance
+      if (chatMinimap) {
+        chatMinimap.remove();
+        chatMinimap = null;
+      }
+
+      // Initialize miniature leaflet
+      chatMinimap = L.map(container, {
+        zoomControl: false,
+        attributionControl: false,
+        dragging: false,
+        touchZoom: false,
+        scrollWheelZoom: false,
+        doubleClickZoom: false
+      });
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(chatMinimap);
+
+      const userIcon = L.divIcon({
+        className: 'custom-div-icon',
+        html: '<div class="pulse-marker user" style="width:10px; height:10px; border-width:1px;"></div>',
+        iconSize: [12, 12],
+        iconAnchor: [6, 6]
+      });
+
+      const mateIcon = L.divIcon({
+        className: 'custom-div-icon',
+        html: '<div class="pulse-marker mate" style="width:10px; height:10px; border-width:1px;"></div>',
+        iconSize: [12, 12],
+        iconAnchor: [6, 6]
+      });
+
+      chatUserMarker = L.marker(state.userCoords, { icon: userIcon }).addTo(chatMinimap);
+      chatMateMarker = L.marker(mateCoords, { icon: mateIcon }).addTo(chatMinimap);
+
+      // Draw polyline connecting both
+      chatDistanceLine = L.polyline([state.userCoords, mateCoords], {
+        color: 'var(--primary)',
+        weight: 2,
+        dashArray: '4, 4'
+      }).addTo(chatMinimap);
+
+      // Fit map boundaries to view both pins
+      const bounds = L.latLngBounds([state.userCoords, mateCoords]);
+      chatMinimap.fitBounds(bounds, { padding: [15, 15] });
+    }
+
+    function renderChatMessages() {
+      const box = document.getElementById('chat-stream-box');
+      box.innerHTML = '';
+
+      const messages = state.chats.filter(c => c.matchId === activeChatMatchId);
+      
+      if (messages.length === 0) {
+        box.innerHTML = `
+          <div style="text-align:center; margin: 10px 0; font-size:11px; color:var(--neutral-muted);">
+            매칭 성사 기념비적인 첫 메시지를 보내 소통해 보세요!
+          </div>
+        `;
+      } else {
+        messages.forEach(msg => {
+          const isSent = msg.senderId === state.currentUser.id;
+          const bubble = document.createElement('div');
+          bubble.className = `chat-message ${isSent ? 'sent' : 'received'}`;
+          bubble.innerHTML = `
+            <div>${msg.message}</div>
+            <div class="chat-message-time">${msg.timestamp}</div>
+          `;
+          box.appendChild(bubble);
+        });
+      }
+      // Auto Scroll to bottom
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function triggerSendChatMessage() {
+      const input = document.getElementById('chat-message-input');
+      const val = input.value.trim();
+      if (!val) return;
+
+      const date = new Date();
+      const timeStr = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+
+      // Append message
+      state.chats.push({
+        id: `msg_${Date.now()}`,
+        matchId: activeChatMatchId,
+        senderId: state.currentUser.id,
+        message: val,
+        timestamp: timeStr
+      });
+      saveState();
+
+      input.value = '';
+      renderChatMessages();
+
+      // Run Chatbot simulation reply
+      simulateChatbotResponse(val);
+    }
+
+    // Dynamic Context-Aware Chatbot logic simulating mock mates
+    function simulateChatbotResponse(userText) {
+      const matchObj = state.matches.find(m => m.id === activeChatMatchId);
+      if (!matchObj) return;
+
+      const otherUserId = matchObj.requesterId === state.currentUser.id ? matchObj.recipientId : matchObj.requesterId;
+      const otherMate = MOCK_MATEDB.mockMates.find(x => x.id === otherUserId);
+      if (!otherMate) return; // Only mock seeded mates answer
+
+      // Toggle typing bubble loader
+      const typingIndicator = document.getElementById('chat-typing-bubble');
+      typingIndicator.style.display = 'flex';
+      
+      const chatStream = document.getElementById('chat-stream-box');
+      chatStream.scrollTop = chatStream.scrollHeight;
+
+      // Delayed reply simulating typing speed
+      setTimeout(() => {
+        typingIndicator.style.display = 'none';
+
+        let reply = '';
+        const activity = matchObj.activity;
+
+        // Simple text-matching triggers
+        if (userText.includes("안녕") || userText.includes("하이") || userText.includes("반가")) {
+          reply = `안녕하세요 ${state.currentUser.name} 학우님! 만나서 반가워요. 😊 마침 저도 ${activity}할 메이트 찾고 있었는데 딱 시간대가 맞았네요!`;
+        } else if (userText.includes("어디") || userText.includes("위치") || userText.includes("장소") || userText.includes("만날")) {
+          reply = `저는 지금 ${otherMate.dept} 건물 부근인데, 지도 보니까 가깝네요! 말씀하신 '${matchObj.location}' 근처에서 만나면 편할 것 같아요. 어떤가요?`;
+        } else if (userText.includes("좋아") || userText.includes("네") || userText.includes("그래") || userText.includes("오케")) {
+          reply = "좋습니다! 그럼 공강 시작 시간에 맞춰서 그쪽으로 이동해 있을게요. 도착해서 다시 채팅 남겨주세요~";
+        } else if (userText.includes("교수") || userText.includes("수업")) {
+          reply = `아, 이전 교시 수업 때문에 조금 아슬아슬할 수 있어서, 혹시 5분 정도 늦을 것 같으면 미리 연락드리겠습니다!`;
+        } else {
+          // Generic responses by activity type
+          switch (activity) {
+            case '식사':
+              reply = "좋아요! 오늘 안 그래도 메뉴 고민 중이었는데, 같이 학식당에서 편하게 밥 먹고 이런저런 얘기 나눠요. ㅎㅎ";
+              break;
+            case '카페':
+              reply = "카페 가서 가볍게 음료 마시면서 수다 떠는 거 좋죠! 시원한 아메리카노 한 잔 하면서 머리 좀 식혀요~";
+              break;
+            case '공부':
+              reply = "공강 시간에 빈둥거리는 것보다 같이 공부하고 모르는 거 서로 질문하면 집중도 잘 되고 유익할 것 같아요! 도서관에서 봐요.";
+              break;
+            case '산책':
+              reply = "날씨도 좋은데 백양로 주변 산책하면서 힐링해요. 공강 시간을 활용해 가벼운 산책으로 활력을 얻어봅시다!";
+              break;
+            default:
+              reply = "네! 그럼 이따 공강 시간에 만나요. 기대되네요~";
+          }
+        }
+
+        const date = new Date();
+        const timeStr = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+
+        state.chats.push({
+          id: `msg_${Date.now()}`,
+          matchId: activeChatMatchId,
+          senderId: otherMate.id,
+          message: reply,
+          timestamp: timeStr
+        });
+        saveState();
+        
+        renderChatMessages();
+      }, 1500);
+    }
+
+    // --------------------------------------------------
+    // 8. SIGNUP FILE UPLOAD SIMULATOR (Drag-and-Drop)
+    // --------------------------------------------------
+    function setupVerifyUpload() {
+      const zone = document.getElementById('verify-upload-zone');
+      const input = document.getElementById('signup-file');
+      const preview = document.getElementById('verify-preview-box');
+      const previewImg = document.getElementById('verify-preview-img');
+      const previewName = document.getElementById('verify-preview-filename');
+      const clearBtn = document.getElementById('verify-clear-upload');
+
+      zone.addEventListener('click', () => input.click());
+
+      zone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        zone.style.borderColor = 'var(--primary-dark)';
+      });
+
+      zone.addEventListener('dragleave', () => {
+        zone.style.borderColor = 'rgba(56, 189, 248, 0.4)';
+      });
+
+      zone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        zone.style.borderColor = 'rgba(56, 189, 248, 0.4)';
+        if (e.dataTransfer.files.length > 0) {
+          handleVerifyFile(e.dataTransfer.files[0]);
+        }
+      });
+
+      input.addEventListener('change', () => {
+        if (input.files.length > 0) {
+          handleVerifyFile(input.files[0]);
+        }
+      });
+
+      clearBtn.addEventListener('click', () => {
+        input.value = '';
+        preview.style.display = 'none';
+        zone.style.display = 'block';
+      });
+
+      function handleVerifyFile(file) {
+        previewName.textContent = file.name;
+        
+        // Render fake thumbnail using FileReader
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          previewImg.src = e.target.result;
+          zone.style.display = 'none';
+          preview.style.display = 'flex';
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    // --------------------------------------------------
+    // 9. SIGNUP ACTION & MOCK REVIEW SIMULATOR
+    // --------------------------------------------------
+    function handleSignupSubmit(e) {
+      e.preventDefault();
+      
+      const name = document.getElementById('signup-name').value.trim();
+      const school = document.getElementById('signup-school').value.trim();
+      const dept = document.getElementById('signup-dept').value.trim();
+      const sid = document.getElementById('signup-sid').value.trim();
+      const email = document.getElementById('signup-email').value.trim();
+      const pw = document.getElementById('signup-pw').value.trim();
+      const fileInput = document.getElementById('signup-file');
+
+      // Check if user exists
+      if (state.users.find(u => u.email === email)) {
+        showToast("이미 등록된 이메일 주소입니다.", "error");
+        return;
+      }
+
+      // Check verification document upload
+      if (!fileInput.files.length) {
+        showToast("재학 상태 증명을 위한 학생증 또는 합격증 캡처 이미지를 업로드해 주세요.", "error");
+        return;
+      }
+
+      const fileName = fileInput.files[0].name;
+
+      // Trigger glass review loader
+      const overlay = document.getElementById('verify-screen');
+      const loader = document.getElementById('verify-loader');
+      const success = document.getElementById('verify-success');
+      const title = document.getElementById('verify-status-title');
+      const desc = document.getElementById('verify-status-desc');
+
+      overlay.style.display = 'flex';
+      loader.style.display = 'block';
+      success.style.display = 'none';
+      title.textContent = "대학 재학 인증 심사 중";
+      desc.textContent = "제출하신 학생증 파일을 관리자가 검토하여 학교 소속을 확인하고 있습니다. 잠시만 기다려주세요...";
+
+      // 3 seconds fake approval process
+      setTimeout(() => {
+        loader.style.display = 'none';
+        success.style.display = 'flex';
+        title.textContent = "가입 접수 완료!";
+        desc.textContent = "아키코마 학우 회원 정보와 증명 서류가 성공적으로 등록되었습니다. 소속 인증 승인 진행 후 매칭 서비스를 이용할 수 있습니다.";
+
+        // Create new user in LocalStorage DB
+        const newUser = {
+          id: `student_${Date.now()}`,
+          name: name,
+          email: email,
+          password: pw,
+          dept: dept,
+          sid: sid,
+          school: school,
+          isVerified: false,
+          verifiedDoc: fileName
+        };
+
+        state.users.push(newUser);
+        state.currentUser = newUser;
+        saveState();
+
+        // Calculate initial times (empty grid -> all day free slots calculated)
+        recalculateFreeTimes(newUser.id);
+
+        setTimeout(() => {
+          overlay.style.display = 'none';
+          hideAuthView();
+          switchTab('home');
+          showToast(`반가워요, ${name} 학우님! 인증 서류가 접수되었습니다.`, "success");
+        }, 1800);
+
+      }, 2000);
+    }
+
+    // --------------------------------------------------
+    // 10. LOGIN ACTION
+    // --------------------------------------------------
+    function handleLoginSubmit(e) {
+      e.preventDefault();
+      const email = document.getElementById('login-email').value.trim();
+      const pw = document.getElementById('login-pw').value.trim();
+
+      const user = state.users.find(u => u.email === email && u.password === pw);
+
+      if (user) {
+        state.currentUser = user;
+        saveState();
+        hideAuthView();
+        switchTab('home');
+        showToast(`${user.name} 학우님, 반갑습니다! 편안한 공강 메이트 매칭되세요.`, "success");
+      } else {
+        showToast("이메일 혹은 비밀번호가 정확하지 않습니다. 다시 입력해 주세요.", "error");
+      }
+    }
+
+    // --- Switch between login and signup forms ---
+    function setupAuthFormSwitcher() {
+      const link = document.getElementById('auth-switcher');
+      const loginForm = document.getElementById('login-form');
+      const signupForm = document.getElementById('signup-form');
+      const wrap = document.getElementById('auth-switcher-wrap');
+      const titleDesc = document.querySelector('.auth-logo p');
+
+      if (!link) return;
+
+      link.addEventListener('click', () => {
+        if (loginForm.style.display === 'none') {
+          // Switch to Login
+          loginForm.style.display = 'block';
+          signupForm.style.display = 'none';
+          wrap.innerHTML = `계정이 없으신가요? <span id="auth-switcher">회원가입</span>`;
+          titleDesc.textContent = "시간표 분석 기반 공강 메이트 매칭";
+        } else {
+          // Switch to Signup
+          loginForm.style.display = 'none';
+          signupForm.style.display = 'block';
+          wrap.innerHTML = `이미 계정이 있으신가요? <span id="auth-switcher">로그인</span>`;
+          titleDesc.textContent = "아키코마 학우 회원가입";
+        }
+        // Re-bind click event
+        setupAuthFormSwitcher();
+      });
+    }
+
+    function showAuthView() {
+      document.getElementById('auth-panel').style.display = 'flex';
+      document.getElementById('header-user-badge').style.display = 'none';
+    }
+
+    function hideAuthView() {
+      document.getElementById('auth-panel').style.display = 'none';
+      document.getElementById('header-user-badge').style.display = 'flex';
+      document.getElementById('header-user-name').textContent = `${state.currentUser.name} 학우`;
+    }
+
+    // --------------------------------------------------
+    // 11. MODAL BOX CONTROLLERS
+    // --------------------------------------------------
+    function setupModals() {
+      // Add Class Modal
+      const addClassBtn = document.getElementById('btn-open-add-class');
+      const addClassModal = document.getElementById('add-class-modal');
+      const closeClassModal = document.getElementById('btn-close-class-modal');
+
+      addClassBtn.addEventListener('click', () => addClassModal.style.display = 'flex');
+      closeClassModal.addEventListener('click', () => addClassModal.style.display = 'none');
+
+      // Add Class Form submission
+      document.getElementById('add-class-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const name = document.getElementById('class-name').value.trim();
+        const prof = document.getElementById('class-prof').value.trim();
+        const room = document.getElementById('class-room').value.trim();
+        const start = document.getElementById('class-start').value;
+        const end = document.getElementById('class-end').value;
+
+        // Get checked days
+        const checkedDayBoxes = document.querySelectorAll('input[name="class-day-check"]:checked');
+        if (checkedDayBoxes.length === 0) {
+          showToast("수업을 등록할 요일을 최소 하나 이상 선택해 주세요.", "error");
+          return;
+        }
+        const selectedDays = Array.from(checkedDayBoxes).map(cb => Number(cb.value));
+
+        // Validation check
+        if (timeToMinutes(start) >= timeToMinutes(end)) {
+          showToast("수업 종료 시간은 시작 시간보다 늦어야 합니다.", "error");
+          return;
+        }
+
+        // Check overlaps on all selected days
+        for (let day of selectedDays) {
+          const userClasses = state.timetables.filter(c => c.userId === state.currentUser.id && c.day === day);
+          for (let uc of userClasses) {
+            const ucStart = timeToMinutes(uc.startTime);
+            const ucEnd = timeToMinutes(uc.endTime);
+            const newStart = timeToMinutes(start);
+            const newEnd = timeToMinutes(end);
+
+            if (Math.max(ucStart, newStart) < Math.min(ucEnd, newEnd)) {
+              const dayNames = ['월요일', '화요일', '수요일', '목요일', '금요일'];
+              showToast(`${dayNames[day]}에 "${uc.name}" 수업 시간대와 중복됩니다. 다른 시간을 선택해주세요.`, "error");
+              return;
+            }
+          }
+        }
+
+        // Add class blocks for each selected day
+        selectedDays.forEach(day => {
+          state.timetables.push({
+            id: `class_${Date.now()}_${day}`,
+            userId: state.currentUser.id,
+            name: name,
+            professor: prof,
+            classroom: room,
+            day: day,
+            startTime: start,
+            endTime: end
+          });
+        });
+        
+        saveState();
+        recalculateFreeTimes(state.currentUser.id);
+        
+        // Reset inputs and checkbox day badges
+        document.getElementById('add-class-form').reset();
+        document.querySelectorAll('input[name="class-day-check"]').forEach(cb => cb.checked = false);
+        addClassModal.style.display = 'none';
+        
+        renderTimetable();
+        showToast(`시간표에 "${name}" 수업이 성공적으로 등록되었습니다.`, "success");
+      });
+
+      // Match Request Modal Close
+      document.getElementById('btn-close-match-modal').addEventListener('click', () => {
+        document.getElementById('match-request-modal').style.display = 'none';
+      });
+
+      // Match Request Submit Action
+      document.getElementById('match-request-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const recipientId = document.getElementById('match-target-id').value;
+        const msg = document.getElementById('match-message').value.trim();
+        
+        const freeSlotObj = state.freeTimes.find(f => f.id === state.activeFilterFreeSlotId);
+        if (!freeSlotObj) return;
+
+        const mateObj = MOCK_MATEDB.mockMates.find(m => m.id === recipientId);
+        if (!mateObj) return;
+
+        const newMatch = {
+          id: `match_${Date.now()}`,
+          requesterId: state.currentUser.id,
+          recipientId: recipientId,
+          day: Number(freeSlotObj.day),
+          startTime: freeSlotObj.startTime,
+          endTime: freeSlotObj.endTime,
+          activity: state.activeFilterActivity,
+          location: document.getElementById('match-loc-input').value.trim() || mateObj.preferredActivities[freeSlotObj.day].location,
+          status: 'pending',
+          requestTime: new Date().toLocaleString()
+        };
+
+        state.matches.push(newMatch);
+        saveState();
+
+        document.getElementById('match-request-modal').style.display = 'none';
+        document.getElementById('match-message').value = '';
+        renderMatches();
+        showToast(`${mateObj.name} 학우에게 매칭 신청이 전송되었습니다!`, "success");
+
+        // --- Mock auto-acceptance triggers after 4 seconds ---
+        setTimeout(() => {
+          newMatch.status = 'accepted';
+          saveState();
+          
+          // Seed initial chatroom message
+          state.chats.push({
+            id: `msg_init_${Date.now()}`,
+            matchId: newMatch.id,
+            senderId: recipientId,
+            message: `반가워요! 신청 수락했어요. ${msg ? '"' + msg + '"라고 보내주셨네요!' : ''}`,
+            timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+          });
+          saveState();
+
+          showToast(`🎉 ${mateObj.name} 학우님이 매칭 신청을 수락했습니다! 채팅방이 활성화되었습니다.`, "success");
+          
+          // Refresh list if user is on home or match views
+          if (state.activeTab === 'home') renderHomeDashboard();
+          if (state.activeTab === 'match') renderMatches();
+        }, 4000);
+
+      });
+
+      // Chat panels close
+      document.getElementById('btn-close-chat').addEventListener('click', () => {
+        document.getElementById('chat-conversation-panel').style.display = 'none';
+        activeChatMatchId = null;
+        if (chatMinimap) {
+          chatMinimap.remove();
+          chatMinimap = null;
+        }
+        renderChatRooms();
+      });
+
+      // Chat message input handlers
+      document.getElementById('btn-send-message').addEventListener('click', triggerSendChatMessage);
+      document.getElementById('chat-message-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') triggerSendChatMessage();
+      });
+    }
+
+    window.openMatchModal = function(mateId) {
+      const mate = MOCK_MATEDB.mockMates.find(m => m.id === mateId);
+      if (!mate) return;
+
+      const freeSlotObj = state.freeTimes.find(f => f.id === state.activeFilterFreeSlotId);
+      if (!freeSlotObj) return;
+
+      document.getElementById('match-target-id').value = mateId;
+      document.getElementById('match-target-name').textContent = `${mate.name} (${mate.dept})`;
+      
+      const days = ['월', '화', '수', '목', '금'];
+      document.getElementById('match-target-detail').textContent = 
+        `${days[freeSlotObj.day]}요일 ${freeSlotObj.startTime} - ${freeSlotObj.endTime} 공강 · 희망 활동: ${state.activeFilterActivity}`;
+
+      // Open Modal box
+      document.getElementById('match-request-modal').style.display = 'flex';
+    };
+
+    // --------------------------------------------------
+    // 12. INITIALIZATION & BIND EVENTS
+    // --------------------------------------------------
+    function bindUiEvents() {
+      // Activity Filter tab chips click triggers
+      document.querySelectorAll('#match-activity-chips .activity-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          document.querySelectorAll('#match-activity-chips .activity-chip').forEach(c => c.classList.remove('active'));
+          chip.classList.add('active');
+          state.activeFilterActivity = chip.getAttribute('data-activity');
+          
+          // Re-trigger search rendering
+          renderMatches();
+          updateMapMarkers();
+        });
+      });
+
+      // Active slot select dropdown triggers
+      document.getElementById('match-slot-select').addEventListener('change', (e) => {
+        state.activeFilterFreeSlotId = e.target.value;
+        renderMatches();
+        updateMapMarkers();
+      });
+
+      // Search button
+      document.getElementById('btn-search-mates').addEventListener('click', () => {
+        renderMatches();
+        updateMapMarkers();
+        showToast("주변 실시간 매칭 조회가 완료되었습니다.", "success");
+      });
+
+      // Logout handler
+      document.getElementById('btn-logout').addEventListener('click', () => {
+        state.currentUser = null;
+        saveState();
+        showAuthView();
+        showToast("로그아웃 되었습니다.", "info");
+      });
+
+      // Reset DB handler
+      document.getElementById('btn-reset-db').addEventListener('click', () => {
+        if (confirm("데모 데이터베이스를 완전히 리셋하시겠습니까?\n모든 회원 정보 및 수정된 시간표 내역이 초기화됩니다.")) {
+          reseedDatabase();
+          state.currentUser = state.users[0];
+          saveState();
+          switchTab('home');
+          showToast("데모 데이터가 성공적으로 초기화되었습니다.", "success");
+        }
+      });
+      
+      // Auth forms
+      document.getElementById('login-form').addEventListener('submit', handleLoginSubmit);
+      document.getElementById('signup-form').addEventListener('submit', handleSignupSubmit);
+      setupAuthFormSwitcher();
+      setupVerifyUpload();
+    }
+
+    // App Startup Entry Point
+    window.addEventListener('DOMContentLoaded', () => {
+      // Init Database State
+      initLocalStorage();
+
+      // Dropdown hours 08:00 - 20:00 setup
+      setupHourDropdowns();
+
+      // UI listeners & popups
+      bindUiEvents();
+      setupModals();
+
+      // Route checks
+      if (state.currentUser) {
+        hideAuthView();
+        switchTab('home');
+      } else {
+        showAuthView();
+      }
+      
+      lucide.createIcons();
+    });
+  </script>
+</body>
+</html>
